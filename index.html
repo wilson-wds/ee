@@ -154,12 +154,16 @@
         </button>
     </div>
 
-    <div id="crmContent" class="max-w-6xl mx-auto bg-white p-6 rounded-lg shadow-xl" style="display: none;">
+    <div id="crmFormAndNewApps" class="max-w-6xl mx-auto bg-white p-6 rounded-lg shadow-xl" style="display: none;">
         <div class="flex justify-between items-center mb-8 relative">
-            <h1 class="text-3xl font-bold text-gray-800 fade-in-up">小額貸款客戶關係管理系統</h1>
-            <div class="flex items-center">
-                <p id="userIdDisplay" class="text-sm text-gray-600 mr-4 fade-in-up" style="animation-delay: 0.2s;">離線模式</p>
-                <button id="goToHomepageButton"
+            <h1 class="text-3xl font-bold text-gray-800 fade-in-up">小額貸款CRM管理</h1>
+            <div class="flex items-center space-x-2">
+                <p id="userIdDisplay" class="text-sm text-gray-600 fade-in-up" style="animation-delay: 0.2s;">離線模式</p>
+                <button id="goToCustomerListsButton"
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-rose-600 hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500 transition duration-150 ease-in-out transform hover:scale-105">
+                    查看客戶列表
+                </button>
+                <button id="goToHomepageButtonFromCrm"
                         class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition duration-150 ease-in-out transform hover:scale-105">
                     回首頁
                 </button>
@@ -238,7 +242,7 @@
             </form>
         </div>
 
-        <div class="bg-white p-6 rounded-lg shadow-md mb-10 fade-in-up" style="animation-delay: 1.2s;">
+        <div class="bg-white p-6 rounded-lg shadow-md fade-in-up" style="animation-delay: 1.2s;">
             <h2 class="text-2xl font-semibold text-gray-800 mb-6">新申請與審核中列表</h2>
             <div class="overflow-x-auto rounded-lg border border-gray-200">
                 <table class="min-w-full divide-y divide-gray-200">
@@ -268,8 +272,25 @@
                 <button id="nextNewApp" class="px-4 py-2 bg-rose-700 text-white rounded-md hover:bg-rose-800 disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 ease-in-out transform hover:scale-105">下一頁</button>
             </div>
         </div>
+    </div>
 
-        <div class="bg-white p-6 rounded-lg shadow-md fade-in-up" style="animation-delay: 1.4s;">
+    <div id="customerListsPage" class="max-w-6xl mx-auto bg-white p-6 rounded-lg shadow-xl" style="display: none;">
+        <div class="flex justify-between items-center mb-8 relative">
+            <h1 class="text-3xl font-bold text-gray-800 fade-in-up">客戶列表</h1>
+            <div class="flex items-center space-x-2">
+                <p class="text-sm text-gray-600 fade-in-up" style="animation-delay: 0.2s;">離線模式</p>
+                <button id="goToCrmFormButton"
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-rose-600 hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500 transition duration-150 ease-in-out transform hover:scale-105">
+                    返回CRM管理
+                </button>
+                <button id="goToHomepageButtonFromLists"
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition duration-150 ease-in-out transform hover:scale-105">
+                    回首頁
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-md fade-in-up" style="animation-delay: 0.8s;">
             <h2 class="text-2xl font-semibold text-gray-800 mb-6">已配合客戶列表</h2>
             <div class="overflow-x-auto rounded-lg border border-gray-200">
                 <table class="min-w-full divide-y divide-gray-200">
@@ -389,9 +410,17 @@
     <script>
         // Get elements
         const homepageSection = document.getElementById('homepage');
-        const crmContentSection = document.getElementById('crmContent');
+        const crmFormAndNewAppsSection = document.getElementById('crmFormAndNewApps'); // Renamed
+        const customerListsPageSection = document.getElementById('customerListsPage'); // New section
+
         const goToCrmButton = document.getElementById('goToCrmButton');
-        const goToHomepageButton = document.getElementById('goToHomepageButton');
+        const goToCustomerListsButton = document.getElementById('goToCustomerListsButton'); // New button
+        const goToCrmFormButton = document.getElementById('goToCrmFormButton'); // New button on lists page
+
+        // Buttons to go back to homepage (from different sections)
+        const goToHomepageButtonFromCrm = document.getElementById('goToHomepageButtonFromCrm');
+        const goToHomepageButtonFromLists = document.getElementById('goToHomepageButtonFromLists');
+
 
         const loanApplicationForm = document.getElementById('loanApplicationForm');
         const loanApplicationsTableBody = document.getElementById('loanApplicationsTableBody');
@@ -865,20 +894,30 @@
 
         // Function to navigate between pages
         function navigateTo(page) {
+            // Hide all main sections first
+            homepageSection.style.display = 'none';
+            crmFormAndNewAppsSection.style.display = 'none';
+            customerListsPageSection.style.display = 'none';
+
+            // Show the requested section
             if (page === 'homepage') {
                 homepageSection.style.display = 'block';
-                crmContentSection.style.display = 'none';
-            } else if (page === 'crm') {
-                homepageSection.style.display = 'none';
-                crmContentSection.style.display = 'block';
-                // Re-render CRM content when navigating to it
-                renderAllApplications();
+            } else if (page === 'crmFormAndNewApps') {
+                crmFormAndNewAppsSection.style.display = 'block';
+                renderAllApplications(); // Re-render CRM content when navigating to it
+            } else if (page === 'customerListsPage') {
+                customerListsPageSection.style.display = 'block';
+                renderAllApplications(); // Re-render customer lists when navigating to it
             }
         }
 
         // Add event listeners for navigation buttons
-        goToCrmButton.addEventListener('click', () => navigateTo('crm'));
-        goToHomepageButton.addEventListener('click', () => navigateTo('homepage'));
+        goToCrmButton.addEventListener('click', () => navigateTo('crmFormAndNewApps'));
+        goToCustomerListsButton.addEventListener('click', () => navigateTo('customerListsPage'));
+        goToCrmFormButton.addEventListener('click', () => navigateTo('crmFormAndNewApps'));
+        goToHomepageButtonFromCrm.addEventListener('click', () => navigateTo('homepage'));
+        goToHomepageButtonFromLists.addEventListener('click', () => navigateTo('homepage'));
+
 
         // --- localStorage functions ---
         function loadApplications() {
@@ -900,7 +939,7 @@
         function initializeApp() {
             showLoading(); // Show loading overlay for initial animation
             loadApplications(); // Load data from localStorage
-            renderAllApplications(); // Render initial data
+            // No need to renderAllApplications here, it will be called by navigateTo
             hideLoading(); // Hide loading overlay
 
             // Initialize loan term input state based on default "interest only" checkbox state on page load
