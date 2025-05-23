@@ -242,7 +242,7 @@
             </form>
         </div>
 
-        <div class="bg-white p-6 rounded-lg shadow-md fade-in-up" style="animation-delay: 1.2s;">
+        <div class="bg-white p-6 rounded-lg shadow-md mb-10 fade-in-up" style="animation-delay: 1.2s;">
             <h2 class="text-2xl font-semibold text-gray-800 mb-6">新申請與審核中列表</h2>
             <div class="overflow-x-auto rounded-lg border border-gray-200">
                 <table class="min-w-full divide-y divide-gray-200">
@@ -406,6 +406,10 @@
             </form>
         </div>
     </div>
+
+    <footer class="text-center text-gray-500 text-sm mt-10 p-4">
+        &copy; 2025 龐資財富管理 版權所有.
+    </footer>
 
     <script>
         // Get elements
@@ -904,9 +908,13 @@
                 homepageSection.style.display = 'block';
             } else if (page === 'crmFormAndNewApps') {
                 crmFormAndNewAppsSection.style.display = 'block';
+                // Reset pagination for new applications when navigating to this page
+                currentPageNewApp = 1;
                 renderAllApplications(); // Re-render CRM content when navigating to it
             } else if (page === 'customerListsPage') {
                 customerListsPageSection.style.display = 'block';
+                // Reset pagination for cooperating customers when navigating to this page
+                currentPageCoopCust = 1;
                 renderAllApplications(); // Re-render customer lists when navigating to it
             }
         }
@@ -917,7 +925,6 @@
         goToCrmFormButton.addEventListener('click', () => navigateTo('crmFormAndNewApps'));
         goToHomepageButtonFromCrm.addEventListener('click', () => navigateTo('homepage'));
         goToHomepageButtonFromLists.addEventListener('click', () => navigateTo('homepage'));
-
 
         // --- localStorage functions ---
         function loadApplications() {
