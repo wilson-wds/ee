@@ -51,7 +51,7 @@
             text-decoration: none;
             cursor: pointer;
         }
-        /* Loading overlay (kept for initial animation, but not for data loading) */
+        /* Loading overlay */
         .loading-overlay {
             display: flex;
             justify-content: center;
@@ -130,6 +130,38 @@
             transition: background-color 0.2s ease-in-out;
         }
     </style>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, setDoc, deleteDoc, onSnapshot, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // 全域變數 (由 Canvas 環境提供)
+        // IMPORTANT: If you are running this code outside of a Canvas environment,
+        // you will need to replace these with your actual Firebase project config.
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // 初始化 Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // 將 Firebase 相關物件掛載到 window 物件，以便在主腳本中存取
+        window.db = db;
+        window.auth = auth;
+        window.initialAuthToken = initialAuthToken;
+        window.appId = appId;
+        window.collection = collection;
+        window.addDoc = addDoc;
+        window.setDoc = setDoc;
+        window.deleteDoc = deleteDoc;
+        window.onSnapshot = onSnapshot;
+        window.doc = doc;
+        window.signInAnonymously = signInAnonymously;
+        window.signInWithCustomToken = signInWithCustomToken;
+        window.onAuthStateChanged = onAuthStateChanged;
+    </script>
 </head>
 <body class="p-4 sm:p-6 md:p-8 lg:p-10">
     <div id="loadingOverlay" class="loading-overlay">
@@ -158,7 +190,7 @@
         <div class="flex justify-between items-center mb-8 relative">
             <h1 class="text-3xl font-bold text-gray-800 fade-in-up">小額貸款CRM管理</h1>
             <div class="flex items-center space-x-2">
-                <p id="userIdDisplay" class="text-sm text-gray-600 fade-in-up" style="animation-delay: 0.2s;">離線模式</p>
+                <p id="userIdDisplay" class="text-sm text-gray-600 fade-in-up" style="animation-delay: 0.2s;">使用者 ID: 載入中...</p>
                 <button id="goToCustomerListsButton"
                         class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-rose-600 hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500 transition duration-150 ease-in-out transform hover:scale-105">
                     查看客戶列表
@@ -278,7 +310,7 @@
         <div class="flex justify-between items-center mb-8 relative">
             <h1 class="text-3xl font-bold text-gray-800 fade-in-up">客戶列表</h1>
             <div class="flex items-center space-x-2">
-                <p class="text-sm text-gray-600 fade-in-up" style="animation-delay: 0.2s;">離線模式</p>
+                <p class="text-sm text-gray-600 fade-in-up" style="animation-delay: 0.2s;">使用者 ID: 載入中...</p>
                 <button id="goToCrmFormButton"
                         class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-rose-600 hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500 transition duration-150 ease-in-out transform hover:scale-105">
                     返回CRM管理
@@ -411,20 +443,33 @@
         &copy; 2025 龐資財富管理 版權所有.
     </footer>
 
-    <script>
-        // Get elements
+    <script type="module">
+        // 確保 Firebase 相關物件已載入
+        const db = window.db;
+        const auth = window.auth;
+        const initialAuthToken = window.initialAuthToken;
+        const appId = window.appId;
+        const collection = window.collection;
+        const addDoc = window.addDoc;
+        const setDoc = window.setDoc;
+        const deleteDoc = window.deleteDoc;
+        const onSnapshot = window.onSnapshot;
+        const doc = window.doc;
+        const signInAnonymously = window.signInAnonymously;
+        const signInWithCustomToken = window.signInWithCustomToken;
+        const onAuthStateChanged = window.onAuthStateChanged;
+
+        // 獲取元素
         const homepageSection = document.getElementById('homepage');
-        const crmFormAndNewAppsSection = document.getElementById('crmFormAndNewApps'); // Renamed
-        const customerListsPageSection = document.getElementById('customerListsPage'); // New section
+        const crmFormAndNewAppsSection = document.getElementById('crmFormAndNewApps');
+        const customerListsPageSection = document.getElementById('customerListsPage');
 
         const goToCrmButton = document.getElementById('goToCrmButton');
-        const goToCustomerListsButton = document.getElementById('goToCustomerListsButton'); // New button
-        const goToCrmFormButton = document.getElementById('goToCrmFormButton'); // New button on lists page
+        const goToCustomerListsButton = document.getElementById('goToCustomerListsButton');
+        const goToCrmFormButton = document.getElementById('goToCrmFormButton');
 
-        // Buttons to go back to homepage (from different sections)
         const goToHomepageButtonFromCrm = document.getElementById('goToHomepageButtonFromCrm');
         const goToHomepageButtonFromLists = document.getElementById('goToHomepageButtonFromLists');
-
 
         const loanApplicationForm = document.getElementById('loanApplicationForm');
         const loanApplicationsTableBody = document.getElementById('loanApplicationsTableBody');
@@ -432,26 +477,26 @@
         const editModal = document.getElementById('editModal');
         const editApplicationForm = document.getElementById('editApplicationForm');
         const loadingOverlay = document.getElementById('loadingOverlay');
-        const userIdDisplay = document.getElementById('userIdDisplay'); // This will now just show "離線模式"
+        const userIdDisplay = document.getElementById('userIdDisplay');
 
         const messageBox = document.getElementById('messageBox');
         const messageText = document.getElementById('messageText');
 
-        // Form elements for new application
+        // 表單元素
         const loanAmountInput = document.getElementById('loanAmount');
         const interestRateInput = document.getElementById('interestRate');
         const interestRatePeriodSelect = document.getElementById('interestRatePeriod');
         const isInterestOnlyCheckbox = document.getElementById('isInterestOnly');
         const loanTermMonthsInput = document.getElementById('loanTermMonths');
 
-        // Form elements for edit modal
+        // 編輯模態視窗元素
         const editInterestRateInput = document.getElementById('editInterestRate');
         const editInterestRatePeriodSelect = document.getElementById('editInterestRatePeriod');
         const editIsInterestOnlyCheckbox = document.getElementById('editIsInterestOnly');
         const editLoanTermMonthsInput = document.getElementById('editLoanTermMonths');
         const editMonthlyPaymentInput = document.getElementById('editMonthlyPayment');
 
-        // Pagination elements
+        // 分頁元素
         const prevNewAppBtn = document.getElementById('prevNewApp');
         const nextNewAppBtn = document.getElementById('nextNewApp');
         const currentPageNewAppSpan = document.getElementById('currentPageNewApp');
@@ -462,37 +507,38 @@
         const currentPageCoopCustSpan = document.getElementById('currentPageCoopCust');
         const totalPagesCoopCustSpan = document.getElementById('totalPagesCoopCust');
 
-
-        // Array to store all loan applications
+        // 儲存所有貸款申請的陣列
         let loanApplications = [];
+        let currentUserId = null; // 用於儲存 Firebase 使用者 ID
+        let unsubscribeFirestore = null; // 用於儲存 Firestore 監聽器的取消函數
 
-        // Pagination state
-        const itemsPerPage = 5; // Number of items to display per page
+        // 分頁狀態
+        const itemsPerPage = 5; // 每頁顯示的項目數量
         let currentPageNewApp = 1;
         let currentPageCoopCust = 1;
 
-        // Function to show message box
+        // 顯示訊息框
         function showMessageBox(message) {
             messageText.textContent = message;
             messageBox.style.display = 'block';
         }
 
-        // Function to close message box
+        // 關閉訊息框
         window.closeMessageBox = function() {
             messageBox.style.display = 'none';
         }
 
-        // Function to show loading overlay (for initial animations)
+        // 顯示載入中
         function showLoading() {
             loadingOverlay.style.display = 'flex';
         }
 
-        // Function to hide loading overlay
+        // 隱藏載入中
         function hideLoading() {
             loadingOverlay.style.display = 'none';
         }
 
-        // Function to get status color class
+        // 根據狀態設定標籤顏色
         function getStatusColorClass(status) {
             switch (status) {
                 case '待處理': return 'bg-yellow-100 text-yellow-800';
@@ -505,21 +551,21 @@
         }
 
         /**
-         * Function to calculate monthly payment
-         * @param {number} principal - Loan principal
-         * @param {number} rate - Input interest rate value (e.g., 5 for 5%)
-         * @param {number} term - Loan term (months)
-         * @param {string} ratePeriod - Interest rate period ('annual', 'monthly', 'weekly', 'daily')
-         * @param {boolean} isInterestOnly - Whether it's interest-only payment
-         * @returns {number} Monthly payment amount
+         * 計算月繳金額的函數
+         * @param {number} principal - 貸款本金
+         * @param {number} rate - 輸入的利率值 (例如：5 代表 5%)
+         * @param {number} term - 貸款期數 (月)
+         * @param {string} ratePeriod - 利率週期 ('annual', 'monthly', 'weekly', 'daily')
+         * @param {boolean} isInterestOnly - 是否為純繳利息
+         * @returns {number} 月繳金額
          */
         function calculateMonthlyPayment(principal, rate, term, ratePeriod, isInterestOnly) {
             if (principal <= 0) {
                 return 0;
             }
 
-            let effectiveMonthlyRate = 0; // Monthly interest rate
-            const rateDecimal = rate / 100; // Convert percentage to decimal
+            let effectiveMonthlyRate = 0; // 月利率
+            const rateDecimal = rate / 100; // 將百分比轉換為小數
 
             switch (ratePeriod) {
                 case 'annual':
@@ -529,38 +575,38 @@
                     effectiveMonthlyRate = rateDecimal;
                     break;
                 case 'weekly':
-                    // Assume 52 weeks in a year, approx 52/12 weeks in a month
+                    // 假設一年 52 週，一個月約 52/12 週
                     effectiveMonthlyRate = rateDecimal * (52 / 12);
                     break;
                 case 'daily':
-                    // Assume 365 days in a year, approx 365/12 days in a month
+                    // 假設一年 365 天，一個月約 365/12 天
                     effectiveMonthlyRate = rateDecimal * (365 / 12);
                     break;
                 default:
-                    effectiveMonthlyRate = 0; // Default to zero
+                    effectiveMonthlyRate = 0; // 預設為零
             }
 
             if (isInterestOnly) {
-                // Interest-only payment: Monthly payment = Principal * Monthly Interest Rate
+                // 純繳利息：月繳金額 = 本金 * 月利率
                 return principal * effectiveMonthlyRate;
             } else {
-                // Amortized loan
+                // 一般攤還型貸款
                 if (term <= 0) {
-                    return 0; // Invalid term
+                    return 0; // 期數無效
                 }
-                if (effectiveMonthlyRate === 0) { // Zero interest rate
+                if (effectiveMonthlyRate === 0) { // 零利率情況
                     return principal / term;
                 }
-                // Monthly payment formula: M = P [ i(1 + i)^n ] / [ (1 + i)^n – 1]
+                // 月繳金額計算公式: M = P [ i(1 + i)^n ] / [ (1 + i)^n – 1]
                 const numerator = principal * effectiveMonthlyRate * Math.pow((1 + effectiveMonthlyRate), term);
                 const denominator = Math.pow((1 + effectiveMonthlyRate), term) - 1;
                 return numerator / denominator;
             }
         }
 
-        // Render data to a specific table
+        // 渲染資料到指定的表格
         function displayTableData(data, tableBodyElement) {
-            tableBodyElement.innerHTML = ''; // Clear table
+            tableBodyElement.innerHTML = ''; // 清空表格
 
             if (data.length === 0) {
                 const noDataRow = document.createElement('tr');
@@ -572,7 +618,7 @@
             data.forEach(app => {
                 const newRow = document.createElement('tr');
                 newRow.setAttribute('data-id', app.id);
-                newRow.classList.add('table-row-hover'); // Add hover class
+                newRow.classList.add('table-row-hover');
 
                 const formattedLoanAmount = parseFloat(app.loanAmount).toLocaleString('zh-TW', { style: 'currency', currency: 'TWD' });
                 const formattedMonthlyPayment = parseFloat(app.monthlyPayment).toLocaleString('zh-TW', { style: 'currency', currency: 'TWD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -609,7 +655,7 @@
             });
         }
 
-        // Update pagination control button states and page number display
+        // 更新分頁控制按鈕狀態和頁碼顯示
         function updatePaginationControls(currentPage, totalPages, prevBtn, nextBtn, currentPageSpan, totalPagesSpan) {
             prevBtn.disabled = (currentPage === 1);
             nextBtn.disabled = (currentPage === totalPages || totalPages === 0);
@@ -617,70 +663,69 @@
             totalPagesSpan.textContent = totalPages;
         }
 
-        // Render all loan applications to their respective tables (with pagination logic)
+        // 渲染所有貸款申請到對應的表格 (含分頁邏輯)
         function renderAllApplications() {
             const newApplications = loanApplications.filter(app => app.applicationStatus !== '已撥款');
             const cooperatingCustomers = loanApplications.filter(app => app.applicationStatus === '已撥款');
 
-            // Calculate pagination info for new applications list
+            // 計算新申請列表分頁資訊
             const totalNewAppPages = Math.ceil(newApplications.length / itemsPerPage);
             if (currentPageNewApp > totalNewAppPages && totalNewAppPages > 0) {
-                currentPageNewApp = totalNewAppPages; // Prevent page number from exceeding range
+                currentPageNewApp = totalNewAppPages;
             } else if (totalNewAppPages === 0) {
-                currentPageNewApp = 1; // If no data, set page to 1
+                currentPageNewApp = 1;
             }
             const startIndexNewApp = (currentPageNewApp - 1) * itemsPerPage;
             const endIndexNewApp = startIndexNewApp + itemsPerPage;
             const paginatedNewApplications = newApplications.slice(startIndexNewApp, endIndexNewApp);
 
-            // Calculate pagination info for cooperating customers list
+            // 計算已配合客戶列表分頁資訊
             const totalCoopCustPages = Math.ceil(cooperatingCustomers.length / itemsPerPage);
             if (currentPageCoopCust > totalCoopCustPages && totalCoopCustPages > 0) {
-                currentPageCoopCust = totalCoopCustPages; // Prevent page number from exceeding range
+                currentPageCoopCust = totalCoopCustPages;
             } else if (totalCoopCustPages === 0) {
-                currentPageCoopCust = 1; // If no data, set page to 1
+                currentPageCoopCust = 1;
             }
             const startIndexCoopCust = (currentPageCoopCust - 1) * itemsPerPage;
             const endIndexCoopCust = startIndexCoopCust + itemsPerPage;
             const paginatedCooperatingCustomers = cooperatingCustomers.slice(startIndexCoopCust, endIndexCoopCust);
 
-            // Display data
+            // 顯示資料
             displayTableData(paginatedNewApplications, loanApplicationsTableBody);
             displayTableData(paginatedCooperatingCustomers, cooperatingCustomersTableBody);
 
-            // Update pagination controls
+            // 更新分頁控制
             updatePaginationControls(currentPageNewApp, totalNewAppPages, prevNewAppBtn, nextNewAppBtn, currentPageNewAppSpan, totalPagesNewAppSpan);
             updatePaginationControls(currentPageCoopCust, totalCoopCustPages, prevCoopCustBtn, nextCoopCustBtn, currentPageCoopCustSpan, totalPagesCoopCustSpan);
         }
 
-        // Toggle disabled state of loan term input based on "interest only" checkbox
+        // 根據「純繳利息」選項切換「貸款期數」的禁用狀態
         function toggleLoanTermInput(isInterestOnlyChecked, targetInput) {
             if (isInterestOnlyChecked) {
-                targetInput.value = ''; // Clear term
+                targetInput.value = '';
                 targetInput.disabled = true;
-                targetInput.required = false; // No longer required
-                targetInput.classList.add('bg-gray-100'); // Add gray background
+                targetInput.required = false;
+                targetInput.classList.add('bg-gray-100');
             } else {
                 targetInput.disabled = false;
-                targetInput.required = true; // Restore required
-                targetInput.classList.remove('bg-gray-100'); // Remove gray background
+                targetInput.required = true;
+                targetInput.classList.remove('bg-gray-100');
             }
         }
 
-        // Listen for changes in "interest only" checkbox in new application form
+        // 監聽新增表單中的「純繳利息」選項變化
         isInterestOnlyCheckbox.addEventListener('change', () => {
             toggleLoanTermInput(isInterestOnlyCheckbox.checked, loanTermMonthsInput);
-            // Trigger recalculation of monthly payment
             updateNewFormMonthlyPayment();
         });
 
-        // Listen for changes in interest rate, term, loan amount in new application form to update monthly payment
+        // 監聽新增表單中的利率、期數、貸款金額變化，即時更新月繳金額
         loanAmountInput.addEventListener('input', updateNewFormMonthlyPayment);
         interestRateInput.addEventListener('input', updateNewFormMonthlyPayment);
         interestRatePeriodSelect.addEventListener('change', updateNewFormMonthlyPayment);
         loanTermMonthsInput.addEventListener('input', updateNewFormMonthlyPayment);
 
-        // Calculate monthly payment for new application form (not displayed on form, only calculated internally)
+        // 新增表單的月繳金額計算 (不顯示在表單上，只在內部計算)
         function updateNewFormMonthlyPayment() {
             const loanAmountVal = parseFloat(loanAmountInput.value) || 0;
             const interestRateVal = parseFloat(interestRateInput.value) || 0;
@@ -688,7 +733,6 @@
             const interestRatePeriodVal = interestRatePeriodSelect.value;
             const isInterestOnlyVal = isInterestOnlyCheckbox.checked;
 
-            // If it's interest-only, and term is empty, set term to 1 (to avoid NaN, actual term not used)
             const termForCalc = isInterestOnlyVal ? 1 : loanTermMonthsVal;
 
             calculateMonthlyPayment(
@@ -698,28 +742,26 @@
                 interestRatePeriodVal,
                 isInterestOnlyVal
             );
-            // This monthly payment will be stored in the newApplication object, not directly displayed on the new form.
         }
 
+        // 監聽表單提交事件
+        loanApplicationForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
 
-        // Listen for form submission event
-        loanApplicationForm.addEventListener('submit', function(event) {
-            event.preventDefault(); // Prevent default form submission behavior
+            if (!currentUserId) {
+                showMessageBox("系統初始化中，請稍候再試。");
+                return;
+            }
 
-            // Generate a simple unique ID for localStorage
-            const newId = Date.now().toString();
-
-            // Get form input values
             const loanAmount = parseFloat(loanAmountInput.value);
             const interestRate = parseFloat(interestRateInput.value);
             const interestRatePeriod = interestRatePeriodSelect.value;
             const isInterestOnly = isInterestOnlyCheckbox.checked;
-            const loanTermMonths = parseInt(loanTermMonthsInput.value) || (isInterestOnly ? 0 : 1); // If interest-only, store term as 0 or not used
+            const loanTermMonths = parseInt(loanTermMonthsInput.value) || (isInterestOnly ? 0 : 1);
 
             const monthlyPayment = calculateMonthlyPayment(loanAmount, interestRate, loanTermMonths, interestRatePeriod, isInterestOnly);
 
             const newApplication = {
-                id: newId, // Assign the generated ID
                 customerName: document.getElementById('customerName').value,
                 loanAmount: loanAmount,
                 interestRate: interestRate,
@@ -731,28 +773,29 @@
                 contactEmail: document.getElementById('contactEmail').value,
                 applicationStatus: document.getElementById('applicationStatus').value,
                 notes: document.getElementById('notes').value,
-                createdAt: new Date().toISOString() // Add creation timestamp
+                createdAt: new Date().toISOString()
             };
 
-            loanApplications.push(newApplication);
-            saveApplications(); // Save to localStorage
-            renderAllApplications(); // Re-render tables
+            try {
+                await addDoc(collection(db, `artifacts/${appId}/users/${currentUserId}/loanApplications`), newApplication);
+                showMessageBox("貸款申請已成功新增！");
+            } catch (e) {
+                console.error("Error adding document: ", e);
+                showMessageBox(`新增申請失敗: ${e.message}`);
+            }
 
-            showMessageBox("貸款申請已成功新增！");
-
-            // Clear form and reset interest-only checkbox
             loanApplicationForm.reset();
-            isInterestOnlyCheckbox.checked = false; // Ensure interest-only is unchecked after reset
-            toggleLoanTermInput(false, loanTermMonthsInput); // Ensure term input is re-enabled
+            isInterestOnlyCheckbox.checked = false;
+            toggleLoanTermInput(false, loanTermMonthsInput);
         });
 
-        // Open edit modal
+        // 開啟編輯模態視窗
         window.openEditModal = function(id) {
             const appToEdit = loanApplications.find(app => app.id === id);
             if (appToEdit) {
                 document.getElementById('editApplicationId').value = appToEdit.id;
                 document.getElementById('editCustomerName').value = appToEdit.customerName;
-                document.getElementById('editLoanAmount').value = parseFloat(appToEdit.loanAmount).toLocaleString('zh-TW', { style: 'currency', currency: 'TWD' }); // Formatted display
+                document.getElementById('editLoanAmount').value = parseFloat(appToEdit.loanAmount).toLocaleString('zh-TW', { style: 'currency', currency: 'TWD' });
                 document.getElementById('editInterestRate').value = appToEdit.interestRate;
                 document.getElementById('editInterestRatePeriod').value = appToEdit.interestRatePeriod;
                 document.getElementById('editIsInterestOnly').checked = appToEdit.isInterestOnly;
@@ -762,13 +805,9 @@
                 document.getElementById('editApplicationStatus').value = appToEdit.applicationStatus;
                 document.getElementById('editNotes').value = appToEdit.notes;
 
-                // Toggle term input state based on "interest only" checkbox in edit modal
                 toggleLoanTermInput(editIsInterestOnlyCheckbox.checked, editLoanTermMonthsInput);
-
-                // Recalculate and display monthly payment when editing
                 updateEditMonthlyPayment();
 
-                // Listen for changes in interest rate, term, interest only in edit modal to update monthly payment in real-time
                 editInterestRateInput.oninput = updateEditMonthlyPayment;
                 editInterestRatePeriodSelect.onchange = updateEditMonthlyPayment;
                 editIsInterestOnlyCheckbox.onchange = () => {
@@ -777,42 +816,45 @@
                 };
                 editLoanTermMonthsInput.oninput = updateEditMonthlyPayment;
 
-                editModal.style.display = 'flex'; // Show modal
+                editModal.style.display = 'flex';
             }
         }
 
-        // Update monthly payment in edit modal
+        // 更新編輯模態視窗中的月繳金額
         function updateEditMonthlyPayment() {
             const currentApp = loanApplications.find(app => app.id === document.getElementById('editApplicationId').value);
-            const loanAmount = parseFloat(currentApp.loanAmount); // Get loan amount from original data
+            const loanAmount = parseFloat(currentApp.loanAmount);
 
             const interestRate = parseFloat(editInterestRateInput.value) || 0;
             const interestRatePeriod = editInterestRatePeriodSelect.value;
             const isInterestOnly = editIsInterestOnlyCheckbox.checked;
-            const loanTermMonths = parseInt(editLoanTermMonthsInput.value) || (isInterestOnly ? 0 : 1); // If interest-only, set term to 0 or 1 for calculation
+            const loanTermMonths = parseInt(editLoanTermMonthsInput.value) || (isInterestOnly ? 0 : 1);
 
             const monthlyPayment = calculateMonthlyPayment(loanAmount, interestRate, loanTermMonths, interestRatePeriod, isInterestOnly);
             editMonthlyPaymentInput.value = monthlyPayment.toLocaleString('zh-TW', { style: 'currency', currency: 'TWD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
         }
 
-
-        // Close edit modal
+        // 關閉編輯模態視窗
         window.closeEditModal = function() {
             editModal.style.display = 'none';
-            // Remove event listeners to prevent duplicate binding
             editInterestRateInput.oninput = null;
             editInterestRatePeriodSelect.onchange = null;
             editIsInterestOnlyCheckbox.onchange = null;
             editLoanTermMonthsInput.oninput = null;
         }
 
-        // Save edited application
-        window.saveEditedApplication = function() {
+        // 儲存編輯後的申請
+        window.saveEditedApplication = async function() {
+            if (!currentUserId) {
+                showMessageBox("系統初始化中，請稍候再試。");
+                return;
+            }
+
             const id = document.getElementById('editApplicationId').value;
             const updatedInterestRate = parseFloat(editInterestRateInput.value);
             const updatedInterestRatePeriod = editInterestRatePeriodSelect.value;
             const updatedIsInterestOnly = editIsInterestOnlyCheckbox.checked;
-            const updatedLoanTermMonths = parseInt(editLoanTermMonthsInput.value) || (updatedIsInterestOnly ? 0 : 1); // If interest-only, store term as 0 or not used
+            const updatedLoanTermMonths = parseInt(editLoanTermMonthsInput.value) || (updatedIsInterestOnly ? 0 : 1);
             const updatedContactPhone = document.getElementById('editContactPhone').value;
             const updatedContactEmail = document.getElementById('editContactEmail').value;
             const updatedApplicationStatus = document.getElementById('editApplicationStatus').value;
@@ -820,10 +862,9 @@
 
             const appIndex = loanApplications.findIndex(app => app.id === id);
             if (appIndex > -1) {
-                const currentLoanAmount = loanApplications[appIndex].loanAmount; // Get loan amount from original data
+                const currentLoanAmount = loanApplications[appIndex].loanAmount;
 
-                loanApplications[appIndex] = {
-                    ...loanApplications[appIndex], // Keep existing properties like ID, customerName, loanAmount
+                const updatedData = {
                     interestRate: updatedInterestRate,
                     interestRatePeriod: updatedInterestRatePeriod,
                     isInterestOnly: updatedIsInterestOnly,
@@ -840,30 +881,43 @@
                     applicationStatus: updatedApplicationStatus,
                     notes: updatedNotes
                 };
-                saveApplications(); // Save to localStorage
-                renderAllApplications(); // Re-render tables
-                showMessageBox("貸款申請已成功更新！");
-                closeEditModal(); // Close modal
+
+                try {
+                    await setDoc(doc(db, `artifacts/${appId}/users/${currentUserId}/loanApplications`, id), updatedData, { merge: true });
+                    showMessageBox("貸款申請已成功更新！");
+                } catch (e) {
+                    console.error("Error updating document: ", e);
+                    showMessageBox(`更新申請失敗: ${e.message}`);
+                }
+                closeEditModal();
             }
         }
 
-        // Delete application
-        window.deleteApplication = function(id) {
+        // 刪除申請
+        window.deleteApplication = async function(id) {
+            if (!currentUserId) {
+                showMessageBox("系統初始化中，請稍候再試。");
+                return;
+            }
+
             showMessageBox("確定要刪除這筆申請嗎？");
             messageBox.innerHTML += `<button onclick="confirmDelete('${id}')">確認</button><button onclick="closeMessageBox()" class="ml-3">取消</button>`;
         }
 
-        // Confirm delete
-        window.confirmDelete = function(id) {
-            closeMessageBox(); // Close confirmation message
+        // 確認刪除
+        window.confirmDelete = async function(id) {
+            closeMessageBox();
 
-            loanApplications = loanApplications.filter(app => app.id !== id);
-            saveApplications(); // Save to localStorage
-            renderAllApplications(); // Re-render tables
-            showMessageBox("貸款申請已成功刪除！");
+            try {
+                await deleteDoc(doc(db, `artifacts/${appId}/users/${currentUserId}/loanApplications`, id));
+                showMessageBox("貸款申請已成功刪除！");
+            } catch (e) {
+                console.error("Error removing document: ", e);
+                showMessageBox(`刪除申請失敗: ${e.message}`);
+            }
         }
 
-        // Pagination event listeners
+        // 分頁事件監聽器
         prevNewAppBtn.addEventListener('click', () => {
             if (currentPageNewApp > 1) {
                 currentPageNewApp--;
@@ -896,68 +950,112 @@
             }
         });
 
-        // Function to navigate between pages
+        // 頁面導航函數
         function navigateTo(page) {
-            // Hide all main sections first
+            // 先隱藏所有主要區塊
             homepageSection.style.display = 'none';
             crmFormAndNewAppsSection.style.display = 'none';
             customerListsPageSection.style.display = 'none';
 
-            // Show the requested section
+            // 顯示請求的區塊
             if (page === 'homepage') {
                 homepageSection.style.display = 'block';
             } else if (page === 'crmFormAndNewApps') {
                 crmFormAndNewAppsSection.style.display = 'block';
-                // Reset pagination for new applications when navigating to this page
+                // 導航到此頁面時重置新申請的分頁
                 currentPageNewApp = 1;
-                renderAllApplications(); // Re-render CRM content when navigating to it
+                renderAllApplications(); // 導航時重新渲染CRM內容
             } else if (page === 'customerListsPage') {
                 customerListsPageSection.style.display = 'block';
-                // Reset pagination for cooperating customers when navigating to this page
+                // 導航到此頁面時重置已配合客戶的分頁
                 currentPageCoopCust = 1;
-                renderAllApplications(); // Re-render customer lists when navigating to it
+                renderAllApplications(); // 導航時重新渲染客戶列表
             }
         }
 
-        // Add event listeners for navigation buttons
+        // 新增導航按鈕的事件監聽器
         goToCrmButton.addEventListener('click', () => navigateTo('crmFormAndNewApps'));
         goToCustomerListsButton.addEventListener('click', () => navigateTo('customerListsPage'));
         goToCrmFormButton.addEventListener('click', () => navigateTo('crmFormAndNewApps'));
         goToHomepageButtonFromCrm.addEventListener('click', () => navigateTo('homepage'));
         goToHomepageButtonFromLists.addEventListener('click', () => navigateTo('homepage'));
 
-        // --- localStorage functions ---
-        function loadApplications() {
-            const storedApplications = localStorage.getItem('loanApplications');
-            if (storedApplications) {
-                loanApplications = JSON.parse(storedApplications);
-            } else {
-                loanApplications = []; // Initialize if nothing is stored
+        // 初始化 Firebase 和載入資料
+        async function initializeAppAndLoadData() {
+            showLoading(); // 顯示載入中
+
+            // 1. 處理 Firebase 認證 (自動登入或匿名登入)
+            try {
+                if (window.initialAuthToken) { // 使用 window.initialAuthToken
+                    await signInWithCustomToken(auth, window.initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Firebase authentication error:", error);
+                // 即使認證失敗，也嘗試匿名登入，或者顯示錯誤訊息
+                try {
+                    await signInAnonymously(auth);
+                } catch (anonError) {
+                    console.error("Anonymous sign-in failed:", anonError);
+                    userIdDisplay.textContent = "使用者 ID: 認證失敗";
+                    hideLoading();
+                    return; // 如果認證失敗，停止後續操作
+                }
             }
-        }
 
-        function saveApplications() {
-            localStorage.setItem('loanApplications', JSON.stringify(loanApplications));
-        }
-        // --- End localStorage functions ---
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    currentUserId = user.uid;
+                    userIdDisplay.textContent = `使用者 ID: ${currentUserId}`;
 
+                    // 如果之前有監聽器，先取消
+                    if (unsubscribeFirestore) {
+                        unsubscribeFirestore();
+                    }
 
-        // Initialize the application
-        function initializeApp() {
-            showLoading(); // Show loading overlay for initial animation
-            loadApplications(); // Load data from localStorage
-            // No need to renderAllApplications here, it will be called by navigateTo
-            hideLoading(); // Hide loading overlay
+                    // 監聽 Firestore 資料變化
+                    const q = collection(db, `artifacts/${appId}/users/${currentUserId}/loanApplications`);
+                    unsubscribeFirestore = onSnapshot(q, (snapshot) => {
+                        loanApplications = [];
+                        snapshot.forEach((doc) => {
+                            loanApplications.push({ id: doc.id, ...doc.data() });
+                        });
+                        // 僅在CRM內容或客戶列表頁面可見時渲染應用程式，或在初始載入後渲染
+                        if (crmFormAndNewAppsSection.style.display === 'block' || customerListsPageSection.style.display === 'block') {
+                            renderAllApplications(); // 資料變更時重新渲染
+                        }
+                        hideLoading(); // 資料載入完成後隱藏載入中
+                    }, (error) => {
+                        console.error("Error fetching documents from Firestore:", error);
+                        showMessageBox(`載入資料失敗: ${error.message}`);
+                        hideLoading();
+                    });
+                } else {
+                    currentUserId = null;
+                    userIdDisplay.textContent = "使用者 ID: 未登入";
+                    loanApplications = [];
+                    // 即使未登入也渲染應用程式 (將顯示「沒有資料」)
+                    renderAllApplications();
+                    hideLoading();
 
-            // Initialize loan term input state based on default "interest only" checkbox state on page load
+                    // 如果有 Firestore 監聽器，取消它
+                    if (unsubscribeFirestore) {
+                        unsubscribeFirestore();
+                        unsubscribeFirestore = null;
+                    }
+                }
+            });
+
+            // 頁面載入時，根據預設的「純繳利息」狀態初始化「貸款期數」輸入框
             toggleLoanTermInput(isInterestOnlyCheckbox.checked, loanTermMonthsInput);
 
-            // Initially show the homepage
+            // 初始顯示首頁
             navigateTo('homepage');
         }
 
-        // Execute initialization when the window loads
-        window.onload = initializeApp;
+        // 當視窗載入完成後執行初始化
+        window.onload = initializeAppAndLoadData;
     </script>
 </body>
 </html>
