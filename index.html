@@ -3,615 +3,341 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>運彩獲利計算模板</title>
+    <title>小額貸款CRM (靜態版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
+        /* 自訂字體 */
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: "Inter", sans-serif;
+            background-color: #fff1f2; /* 淺酒紅色背景 (rose-50) */
         }
-        /* CSS for printing only the history section */
-        @media print {
-            body > *:not(#print-area) { /* Hide all direct children of body except the print area */
-                display: none !important;
-            }
-            #print-area { /* Ensure the print area is visible and takes full width */
-                display: block !important;
-                width: 100% !important;
-                margin: 0 !important;
-                padding: 0 !important;
-            }
-            /* Adjust table and text within print area for better print layout */
-            #print-area table {
-                width: 100%;
-                border-collapse: collapse;
-            }
-            #print-area th, #print-area td {
-                border: 1px solid #ddd;
-                padding: 8px;
-                text-align: left;
-            }
-            #print-area h2 {
-                text-align: center;
-                margin-bottom: 20px;
-            }
+        /* 確保表格內容不會過於擁擠 */
+        th, td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+        }
+        /* 模態視窗樣式 (靜態版中此功能將不活躍) */
+        .modal {
+            display: none; /* 預設隱藏 */
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            width: 90%;
+            max-width: 500px;
+        }
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        /* Message box (靜態版中此功能將不活躍) */
+        .message-box {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1002;
+            text-align: center;
         }
     </style>
 </head>
-<body>
-    <div id="root"></div>
+<body class="p-4 sm:p-6 md:p-8 lg:p-10">
+    <div class="max-w-6xl mx-auto bg-white p-6 rounded-lg shadow-xl">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">小額貸款客戶關係管理系統 (靜態展示版)</h1>
 
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-    <script type="text/babel">
-        // Main App component for the Sports Betting Profit Calculator
-        function App() {
-            // State variables to store input values and calculation result for main calculator
-            const [betAmount, setBetAmount] = React.useState(''); // 投注金額
-            const [odds, setOdds] = React.useState('');           // 賠率
-            const [outcome, setOutcome] = React.useState('win');  // 結果 (預設為贏) - 針對單次投注
-            const [singleBetResult, setSingleBetResult] = React.useState(null); // 單次投注計算結果 (獲利/虧損)
-            const [errorMessage, setErrorMessage] = React.useState(''); // 錯誤訊息
-            const [betHistory, setBetHistory] = React.useState([]); // 投注紀錄
-
-            // State variables for date filtering
-            const [startDate, setStartDate] = React.useState(''); // 開始日期
-            const [endDate, setEndDate] = React.useState('');     // 結束日期
-
-            // State for target profit calculation
-            const [targetProfitAmount, setTargetProfitAmount] = React.useState(''); // 目標獲利金額
-            const [requiredBetForTargetProfit, setRequiredBetForTargetProfit] = React.useState(null); // 為達到目標獲利所需投注金額
-
-            // Function to perform instant calculation based on current inputs
-            const calculateInstantResults = React.useCallback(() => {
-                const parsedBetAmount = parseFloat(betAmount);
-                const parsedOdds = parseFloat(odds);
-                const parsedTargetProfitAmount = parseFloat(targetProfitAmount);
-
-                // --- Calculate for Single Bet Result ---
-                if (isNaN(parsedBetAmount) || parsedBetAmount <= 0 || isNaN(parsedOdds) || parsedOdds < 1) {
-                    setSingleBetResult(null);
-                } else {
-                    let calculatedProfit = 0;
-                    if (outcome === 'win') {
-                        calculatedProfit = (parsedBetAmount * parsedOdds) - parsedBetAmount;
-                    } else {
-                        calculatedProfit = -parsedBetAmount;
-                    }
-                    setSingleBetResult(calculatedProfit.toFixed(2));
-                }
-
-                // --- Calculate Required Bet for Target Profit ---
-                if (isNaN(parsedTargetProfitAmount) || parsedTargetProfitAmount <= 0 || isNaN(parsedOdds) || parsedOdds < 1 || (parsedOdds - 1) <= 0) {
-                    setRequiredBetForTargetProfit(null);
-                } else {
-                    // Formula: Required Bet = Target Profit / (Odds - 1)
-                    const requiredBet = parsedTargetProfitAmount / (parsedOdds - 1);
-                    setRequiredBetForTargetProfit(requiredBet.toFixed(2));
-                }
-
-            }, [betAmount, odds, outcome, targetProfitAmount]); // Dependencies for useCallback
-
-            // Use useEffect to trigger instant calculation whenever relevant inputs change
-            React.useEffect(() => {
-                calculateInstantResults();
-            }, [betAmount, odds, outcome, targetProfitAmount, calculateInstantResults]); // Dependencies for useEffect
-
-            // Function to handle the "新增紀錄" button click (adds to history)
-            const handleAddRecordButtonClick = () => {
-                // Clear previous error messages
-                setErrorMessage('');
-
-                const parsedBetAmount = parseFloat(betAmount);
-                const parsedOdds = parseFloat(odds);
-
-                // Input validation before adding to history
-                if (isNaN(parsedBetAmount) || parsedBetAmount <= 0) {
-                    setErrorMessage('請輸入有效的投注金額 (必須是正數)。');
-                    return;
-                }
-                if (isNaN(parsedOdds) || parsedOdds < 1) {
-                    setErrorMessage('請輸入有效的賠率 (必須大於或等於 1)。');
-                    return;
-                }
-
-                // --- 更新投注紀錄 ---
-                const newBetRecord = {
-                    id: Date.now(), // Unique ID for React list key
-                    betAmount: parsedBetAmount,
-                    odds: parsedOdds,
-                    outcome: null, // Initial outcome is null, set when settled
-                    profitLoss: 0, // Initial profit/loss is 0, calculated when settled
-                    date: new Date().toISOString().split('T')[0], // Store current date in YYYY-MM-DD format
-                    status: 'pending', // New: Initial status is pending
-                };
-
-                setBetHistory(prevHistory => {
-                    const updatedHistory = [...prevHistory, newBetRecord];
-                    return updatedHistory;
-                });
-
-                // Optionally clear inputs after adding to history
-                setBetAmount('');
-                setOdds('');
-                setOutcome('win'); // Reset outcome to default
-                setErrorMessage(''); // Clear error message if any
-            };
-
-            // New function to update the status of a bet in history
-            const updateBetStatus = (id, finalOutcome) => {
-                setBetHistory(prevHistory => {
-                    return prevHistory.map(record => {
-                        if (record.id === id) {
-                            let updatedProfitLoss = 0;
-                            if (finalOutcome === 'win') {
-                                updatedProfitLoss = (record.betAmount * record.odds) - record.betAmount;
-                            } else if (finalOutcome === 'loss') {
-                                updatedProfitLoss = -record.betAmount;
-                            }
-                            return {
-                                ...record,
-                                outcome: finalOutcome, // Update the outcome to the final one
-                                profitLoss: updatedProfitLoss,
-                                status: finalOutcome, // Set status to 'win' or 'loss'
-                            };
-                        }
-                        return record;
-                    });
-                });
-            };
-
-            // Memoized filtered history based on date range
-            const filteredBetHistory = React.useMemo(() => {
-                return betHistory.filter(record => {
-                    const recordDate = new Date(record.date);
-                    const start = startDate ? new Date(startDate) : null;
-                    const end = endDate ? new Date(endDate) : null;
-
-                    // Ensure end date includes the entire day
-                    if (end) {
-                        end.setHours(23, 59, 59, 999);
-                    }
-
-                    const isAfterStartDate = !start || recordDate >= start;
-                    const isBeforeEndDate = !end || recordDate <= end;
-
-                    return isAfterStartDate && isBeforeEndDate;
-                }).slice(-10); // Still display only the last 10 *filtered* records
-            }, [betHistory, startDate, endDate]);
-
-            // Calculate total profit/loss from the filtered records, only for settled bets
-            const totalProfitLossFiltered = filteredBetHistory.reduce((sum, record) => {
-                if (record.status === 'win' || record.status === 'loss') {
-                    return sum + record.profitLoss;
-                }
-                return sum;
-            }, 0).toFixed(2);
-
-            // Function to reset all input fields and results
-            const resetFields = () => {
-                setBetAmount('');
-                setOdds('');
-                setOutcome('win');
-                setSingleBetResult(null);
-                setErrorMessage('');
-                setBetHistory([]); // Clear history on reset
-                setStartDate(''); // Clear date filters
-                setEndDate('');   // Clear date filters
-                setTargetProfitAmount(''); // Reset target profit input
-                setRequiredBetForTargetProfit(null); // Reset required bet for target profit
-            };
-
-            // Function to export filtered history to CSV
-            const exportToCsv = () => {
-                if (filteredBetHistory.length === 0) {
-                    setErrorMessage('沒有紀錄可以導出。');
-                    return;
-                }
-
-                const headers = ["日期", "投注金額", "賠率", "結果", "獲利/虧損"];
-                const csvRows = [];
-
-                // Add headers
-                csvRows.push(headers.join(','));
-
-                // Add data rows
-                filteredBetHistory.forEach(record => {
-                    const row = [
-                        record.date,
-                        record.betAmount,
-                        record.odds,
-                        record.status === 'pending' ? '待定' : (record.outcome === 'win' ? '贏' : '輸'),
-                        record.status === 'pending' ? '待定' : record.profitLoss.toFixed(2)
-                    ];
-                    csvRows.push(row.join(','));
-                });
-
-                // Add the total profit/loss row at the end
-                csvRows.push(''); // Add an empty row for separation
-                csvRows.push(`篩選後總獲利/虧損:,${totalProfitLossFiltered} NTD`);
-
-
-                const csvString = csvRows.join('\n');
-                // Prepend BOM to the CSV string for proper UTF-8 interpretation in Excel
-                const blob = new Blob(['\ufeff' + csvString], { type: 'text/csv;charset=utf-8;' });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = `運彩紀錄_${new Date().toISOString().split('T')[0]}.csv`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(link.href); // Clean up the URL object
-            };
-
-            // Function to trigger browser print for only the history section
-            const handlePrintRecordsOnly = () => {
-                const printContent = document.getElementById('bet-history-section');
-                if (!printContent) {
-                    setErrorMessage('找不到投注紀錄區塊進行列印。');
-                    return;
-                }
-
-                // Construct the HTML content for the new print window
-                let printContentHtml = `
-                    <!DOCTYPE html>
-                    <html lang="zh-TW">
-                    <head>
-                        <meta charset="UTF-8">
-                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                        <title>投注紀錄列印</title>
-                        <style>
-                            body { font-family: 'Inter', sans-serif; margin: 20px; }
-                            h2 { text-align: center; margin-bottom: 20px; font-size: 1.5em; }
-                            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                            th { background-color: #f2f2f2; }
-                            .profit-text { color: #16A34A; font-weight: bold; } /* green-600 */
-                            .loss-text { color: #DC2626; font-weight: bold; } /* red-600 */
-                            .blue-text { color: #2563EB; font-weight: bold; } /* blue-600 */
-                            .red-text { color: #DC2626; font-weight: bold; } /* red-600 */
-                            .outcome-badge {
-                                display: inline-block;
-                                padding: 4px 8px;
-                                border-radius: 9999px;
-                                font-weight: 600;
-                                font-size: 0.8em;
-                                line-height: 1;
-                            }
-                            .win-badge { background-color: #D1FAE5; color: #065F46; } /* green-100, green-800 */
-                            .loss-badge { background-color: #FEE2E2; color: #991B1B; } /* red-100, red-800 */
-                        </style>
-                        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-                    </head>
-                    <body>
-                        <h2>投注紀錄</h2>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>日期</th>
-                                    <th>金額</th>
-                                    <th>賠率</th>
-                                    <th>結果</th>
-                                    <th>獲利/虧損</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${filteredBetHistory.map(record => `
-                                    <tr>
-                                        <td>${record.date}</td>
-                                        <td>${record.betAmount}</td>
-                                        <td>${record.odds}</td>
-                                        <td>
-                                            <span class="outcome-badge ${record.status === 'win' ? 'win-badge' : (record.status === 'loss' ? 'loss-badge' : '')}">
-                                                ${record.status === 'pending' ? '待定' : (record.outcome === 'win' ? '贏' : '輸')}
-                                            </span>
-                                        </td>
-                                        <td class="${record.status === 'win' ? 'profit-text' : (record.status === 'loss' ? 'loss-text' : '')}">
-                                            ${record.status === 'pending' ? '待定' : record.profitLoss.toFixed(2)}
-                                        </td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                        <div style="text-align: center; margin-top: 20px; font-size: 1.1em; font-weight: bold;">
-                            篩選後總獲利/虧損:
-                            <span class="${parseFloat(totalProfitLossFiltered) >= 0 ? 'blue-text' : 'red-text'}">
-                                ${totalProfitLossFiltered} NTD
-                            </span>
-                        </div>
-                        <div style="text-align: center; margin-top: 30px; font-size: 0.8em; color: #6B7280;">
-                            威爾設計版權所有
-                        </div>
-                    </body>
-                    </html>
-                `;
-
-                const printWindow = window.open('', '_blank', 'width=800,height=600');
-                if (printWindow) {
-                    printWindow.document.write(printContentHtml);
-                    printWindow.document.close(); // Important to close the document for rendering
-                    printWindow.focus(); // Focus the new window
-
-                    // Use setTimeout to ensure content is rendered before printing
-                    printWindow.onload = () => {
-                        printWindow.print();
-                        printWindow.close();
-                    };
-                } else {
-                    setErrorMessage('無法開啟列印視窗，請檢查瀏覽器設定或彈出視窗阻擋。');
-                }
-            };
-
-
-            return (
-                <div className="min-h-screen bg-gradient-to-br from-red-100 to-white flex flex-col items-center justify-center p-4 font-sans">
-                    {/* Main container for calculator and history, using flexbox for side-by-side layout */}
-                    <div className="flex flex-col md:flex-row md:space-x-8 w-full max-w-6xl">
-
-                        {/* Calculator section (left side) */}
-                        <div className="bg-white p-8 rounded-xl shadow-2xl w-full md:w-1/2 mb-8 md:mb-0 transform transition-all duration-300 hover:scale-[1.01]">
-                            <h1 className="text-3xl font-extrabold text-gray-900 mb-6 text-center">
-                                投注
-                            </h1>
-
-                            {/* Input field for Bet Amount */}
-                            <div className="mb-4">
-                                <label htmlFor="betAmount" className="block text-gray-700 text-sm font-semibold mb-2">
-                                    投注金額 (NTD):
-                                </label>
-                                <input
-                                    type="number"
-                                    id="betAmount"
-                                    value={betAmount}
-                                    onChange={(e) => setBetAmount(e.target.value)}
-                                    placeholder="例如: 1000"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
-                                />
-                            </div>
-
-                            {/* Input field for Odds */}
-                            <div className="mb-4">
-                                <label htmlFor="odds" className="block text-gray-700 text-sm font-semibold mb-2">
-                                    賠率:
-                                </label>
-                                <input
-                                    type="number"
-                                    id="odds"
-                                    value={odds}
-                                    onChange={(e) => setOdds(e.target.value)}
-                                    placeholder="例如: 1.85"
-                                    step="0.01" // Allow decimal input for odds
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
-                                />
-                            </div>
-
-                            {/* Outcome selection (Win/Loss) for single bet - kept for instant calculation visualization */}
-                            <div className="mb-4">
-                                <label className="block text-gray-700 text-sm font-semibold mb-2">
-                                    預期結果 (即時預覽用):
-                                </label>
-                                <div className="flex space-x-4">
-                                    <label className="inline-flex items-center">
-                                        <input
-                                            type="radio"
-                                            name="outcome"
-                                            value="win"
-                                            checked={outcome === 'win'}
-                                            onChange={(e) => setOutcome(e.target.value)}
-                                            className="form-radio h-5 w-5 text-blue-600"
-                                        />
-                                        <span className="ml-2 text-gray-800">贏</span>
-                                    </label>
-                                    <label className="inline-flex items-center">
-                                        <input
-                                            type="radio"
-                                            name="outcome"
-                                            value="loss"
-                                            checked={outcome === 'loss'}
-                                            onChange={(e) => setOutcome(e.target.value)}
-                                            className="form-radio h-5 w-5 text-red-600"
-                                        />
-                                        <span className="ml-2 text-gray-800">輸</span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            {/* Error message display */}
-                            {errorMessage && (
-                                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4" role="alert">
-                                    <span className="block sm:inline">{errorMessage}</span>
-                                </div>
-                            )}
-
-                            {/* Calculation and Reset buttons */}
-                            <div className="flex space-x-4 mb-6">
-                                <button
-                                    onClick={handleAddRecordButtonClick}
-                                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75"
-                                >
-                                    新增紀錄
-                                </button>
-                                <button
-                                    onClick={resetFields}
-                                    className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-75"
-                                >
-                                    重設
-                                </button>
-                            </div>
-
-                            {/* Display area for the single bet result */}
-                            {singleBetResult !== null && (
-                                <div className="mt-6 p-6 bg-gray-50 rounded-xl shadow-inner text-center mb-4">
-                                    <h2 className="text-xl font-semibold text-gray-700 mb-2">單次投注預覽:</h2>
-                                    <p className={`text-4xl font-extrabold ${parseFloat(singleBetResult) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                        {parseFloat(singleBetResult) >= 0 ? '獲利' : '虧損'}: {singleBetResult} NTD
-                                    </p>
-                                    {parseFloat(singleBetResult) > 0 && (
-                                        <p className="text-sm text-gray-600 mt-2">此為預期獲利。</p>
-                                    )}
-                                    {parseFloat(singleBetResult) < 0 && (
-                                        <p className="text-sm text-gray-600 mt-2">此為預期虧損。</p>
-                                    )}
-                                    {parseFloat(singleBetResult) === 0 && (
-                                        <p className="text-sm text-gray-600 mt-2">預期收支平衡。</p>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Section for Target Profit Calculation */}
-                            <div className="mt-6 p-6 bg-gray-100 rounded-xl shadow-inner text-center">
-                                <h2 className="text-xl font-semibold text-gray-800 mb-4">目標獲利所需投注計算</h2>
-                                <div className="mb-4">
-                                    <label htmlFor="targetProfitAmount" className="block text-gray-700 text-sm font-semibold mb-2">
-                                        目標獲利金額 (NTD):
-                                    </label>
-                                    <input
-                                        type="number"
-                                        id="targetProfitAmount"
-                                        value={targetProfitAmount}
-                                        onChange={(e) => setTargetProfitAmount(e.target.value)}
-                                        placeholder="例如: 1000"
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
-                                    />
-                                </div>
-                                {requiredBetForTargetProfit !== null && (
-                                    <p className="text-lg font-bold text-gray-800 mt-4">
-                                        為達到目標獲利，需投注:
-                                        <span className="ml-2 text-purple-600 text-3xl">
-                                            {requiredBetForTargetProfit} NTD
-                                        </span>
-                                    </p>
-                                )}
-                                {(parseFloat(odds) < 1.01 && targetProfitAmount !== '') && ( // Added a small threshold for odds - 1
-                                    <p className="text-red-500 text-sm mt-2">
-                                        賠率過低 (接近1)，無法達到目標獲利，或需投注極大金額。
-                                    </p>
-                                )}
-                            </div>
-
-                        </div>
-
-                        {/* Display area for the last 10 records (right side) */}
-                        <div id="bet-history-section" className="bg-white p-8 rounded-xl shadow-2xl w-full md:w-1/2 overflow-y-auto max-h-[80vh] min-h-[200px]">
-                            <h2 className="text-xl font-extrabold text-gray-900 mb-4 text-center">投注紀錄</h2>
-
-                            {/* Date filter inputs and Export/Print buttons */}
-                            <div className="mb-4 flex flex-col sm:flex-row sm:space-x-4 items-end"> {/* Align items to bottom for button */}
-                                <div className="flex-1 mb-4 sm:mb-0">
-                                    <label htmlFor="startDate" className="block text-gray-700 text-sm font-semibold mb-2">
-                                        開始日期:
-                                    </label>
-                                    <input
-                                        type="date"
-                                        id="startDate"
-                                        value={startDate}
-                                        onChange={(e) => setStartDate(e.target.value)}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
-                                    />
-                                </div>
-                                <div className="flex-1 mb-4 sm:mb-0">
-                                    <label htmlFor="endDate" className="block text-gray-700 text-sm font-semibold mb-2">
-                                        結束日期:
-                                    </label>
-                                    <input
-                                        type="date"
-                                        id="endDate"
-                                        value={endDate}
-                                        onChange={(e) => setEndDate(e.target.value)}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
-                                    />
-                                </div>
-                                <button
-                                    onClick={exportToCsv}
-                                    className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-75 mb-2 sm:mb-0"
-                                >
-                                    導出紀錄
-                                </button>
-                                <button
-                                    onClick={handlePrintRecordsOnly}
-                                    className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-75"
-                                >
-                                    列印紀錄
-                                </button>
-                            </div>
-
-                            {filteredBetHistory.length > 0 ? (
-                                <>
-                                    <div className="overflow-x-auto">
-                                        <table className="min-w-full bg-white rounded-lg shadow-md">
-                                            <thead>
-                                                <tr className="bg-gray-200 text-gray-700 uppercase text-sm leading-normal">
-                                                    <th className="py-3 px-6 text-left">日期</th>
-                                                    <th className="py-3 px-6 text-left">金額</th>
-                                                    <th className="py-3 px-6 text-left">賠率</th>
-                                                    <th className="py-3 px-6 text-left">結果</th>
-                                                    <th className="py-3 px-6 text-left">獲利/虧損</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="text-gray-600 text-sm font-light">
-                                                {filteredBetHistory.map((record) => (
-                                                    <tr key={record.id} className="border-b border-gray-200 hover:bg-gray-100">
-                                                        <td className="py-3 px-6 text-left whitespace-nowrap">{record.date}</td>
-                                                        <td className="py-3 px-6 text-left whitespace-nowrap">{record.betAmount}</td>
-                                                        <td className="py-3 px-6 text-left">{record.odds}</td>
-                                                        <td className="py-3 px-6 text-left">
-                                                            {record.status === 'pending' ? (
-                                                                <div className="flex space-x-2">
-                                                                    <button
-                                                                        onClick={() => updateBetStatus(record.id, 'win')}
-                                                                        className="bg-green-500 hover:bg-green-600 text-white text-xs px-2 py-1 rounded-md transition duration-200"
-                                                                    >
-                                                                        贏
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => updateBetStatus(record.id, 'loss')}
-                                                                        className="bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1 rounded-md transition duration-200"
-                                                                    >
-                                                                        輸
-                                                                    </button>
-                                                                </div>
-                                                            ) : (
-                                                                <span className={`px-2 py-1 font-semibold leading-tight rounded-full ${record.outcome === 'win' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                                                    {record.outcome === 'win' ? '贏' : '輸'}
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        <td className={`py-3 px-6 text-left ${record.status === 'pending' ? 'text-gray-500' : (record.profitLoss >= 0 ? 'text-green-600' : 'text-red-600')}`}>
-                                                            {record.status === 'pending' ? '待定' : record.profitLoss.toFixed(2)}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <div className="mt-4 text-center text-lg font-bold">
-                                        篩選後總獲利/虧損:
-                                        <span className={`ml-2 ${parseFloat(totalProfitLossFiltered) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                                            {totalProfitLossFiltered} NTD
-                                        </span>
-                                    </div>
-                                </>
-                            ) : (
-                                <p className="text-center text-gray-500 mt-8">
-                                    沒有符合篩選條件的投注紀錄。
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                    {/* Copyright notice at the bottom */}
-                    <div className="w-full text-center text-gray-600 text-sm mt-8 pb-4">
-                        威爾設計版權所有
+        <div class="mb-10 p-6 bg-rose-50 rounded-lg shadow-md">
+            <h2 class="text-2xl font-semibold text-rose-900 mb-6">新增貸款申請</h2>
+            <form id="loanApplicationForm" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label for="customerName" class="block text-sm font-medium text-gray-700 mb-1">客戶姓名</label>
+                    <input type="text" id="customerName" name="customerName" placeholder="輸入客戶姓名"
+                           class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-rose-700 focus:border-rose-700 sm:text-sm" required>
+                </div>
+                <div>
+                    <label for="loanAmount" class="block text-sm font-medium text-gray-700 mb-1">貸款金額</label>
+                    <input type="number" id="loanAmount" name="loanAmount" placeholder="輸入貸款金額"
+                           class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-rose-700 focus:border-rose-700 sm:text-sm" required min="0">
+                </div>
+                <div>
+                    <label for="interestRate" class="block text-sm font-medium text-gray-700 mb-1">利率</label>
+                    <div class="flex mt-1">
+                        <input type="number" id="interestRate" name="interestRate" placeholder="例如：5"
+                               class="block w-2/3 px-4 py-2 border border-gray-300 rounded-l-md shadow-sm focus:ring-rose-700 focus:border-rose-700 sm:text-sm" required min="0" step="0.01">
+                        <select id="interestRatePeriod" name="interestRatePeriod"
+                                class="block w-1/3 px-2 py-2 border border-gray-300 rounded-r-md shadow-sm focus:ring-rose-700 focus:border-rose-700 sm:text-sm">
+                            <option value="annual">年 (%)</option>
+                            <option value="monthly">月 (%)</option>
+                            <option value="weekly">週 (%)</option>
+                            <option value="daily">日 (%)</option>
+                        </select>
                     </div>
                 </div>
-            );
+                <div class="flex items-center mt-1">
+                    <input type="checkbox" id="isInterestOnly" name="isInterestOnly"
+                           class="h-4 w-4 text-rose-700 border-gray-300 rounded focus:ring-rose-700">
+                    <label for="isInterestOnly" class="ml-2 block text-sm font-medium text-gray-700">純繳利息</label>
+                </div>
+                <div>
+                    <label for="loanTermMonths" class="block text-sm font-medium text-gray-700 mb-1">貸款期數（月）</label>
+                    <input type="number" id="loanTermMonths" name="loanTermMonths" placeholder="輸入貸款期數，例如：12"
+                           class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-rose-700 focus:border-rose-700 sm:text-sm" required min="1">
+                </div>
+                <div>
+                    <label for="contactPhone" class="block text-sm font-medium text-gray-700 mb-1">聯絡電話</label>
+                    <input type="tel" id="contactPhone" name="contactPhone" placeholder="輸入聯絡電話"
+                           class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-rose-700 focus:border-rose-700 sm:text-sm">
+                </div>
+                <div>
+                    <label for="contactEmail" class="block text-sm font-medium text-gray-700 mb-1">電子郵件</label>
+                    <input type="email" id="contactEmail" name="contactEmail" placeholder="輸入電子郵件"
+                           class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-rose-700 focus:border-rose-700 sm:text-sm">
+                </div>
+                <div>
+                    <label for="applicationStatus" class="block text-sm font-medium text-gray-700 mb-1">申請狀態</label>
+                    <select id="applicationStatus" name="applicationStatus"
+                            class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-rose-700 focus:border-rose-700 sm:text-sm">
+                        <option value="待處理">待處理</option>
+                        <option value="審核中">審核中</option>
+                        <option value="已批准">已批准</option>
+                        <option value="已拒絕">已拒絕</option>
+                        <option value="已撥款">已撥款</option>
+                    </select>
+                </div>
+                <div class="md:col-span-2">
+                    <label for="notes" class="block text-sm font-medium text-gray-700 mb-1">備註</label>
+                    <textarea id="notes" name="notes" rows="3" placeholder="新增備註..."
+                              class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-rose-700 focus:border-rose-700 sm:text-sm"></textarea>
+                </div>
+                <div class="md:col-span-2 flex justify-end">
+                    <button type="submit"
+                            class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-rose-700 hover:bg-rose-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-700 transition duration-150 ease-in-out">
+                        新增申請
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-6">貸款申請列表</h2>
+            <div class="overflow-x-auto rounded-lg border border-gray-200">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">客戶姓名</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">貸款金額</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">利率</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">期數（月）</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">月繳金額</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">聯絡電話</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">電子郵件</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">申請狀態</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">備註</th>
+                            <th scope="col" class="relative px-6 py-3">
+                                <span class="sr-only">操作</span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="loanApplicationsTableBody" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">編輯貸款申請 (無功能)</h3>
+            <p class="text-gray-600">此為靜態展示版，編輯功能未啟用。</p>
+            <div class="flex justify-end mt-4">
+                <button type="button" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-400">
+                    關閉
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="messageBox" class="message-box">
+        <p>此為靜態展示版，訊息提示功能未啟用。</p>
+        <button>確定</button>
+    </div>
+
+    <footer class="text-center text-gray-500 text-sm mt-10 p-4">
+        &copy; 2025 龐資財富管理 版權所有.
+    </footer>
+
+    <script>
+        // 獲取元素
+        const loanApplicationForm = document.getElementById('loanApplicationForm');
+        const loanApplicationsTableBody = document.getElementById('loanApplicationsTableBody');
+        const editModal = document.getElementById('editModal');
+        const messageBox = document.getElementById('messageBox');
+
+        // 表單元素
+        const loanAmountInput = document.getElementById('loanAmount');
+        const interestRateInput = document.getElementById('interestRate');
+        const interestRatePeriodSelect = document.getElementById('interestRatePeriod');
+        const isInterestOnlyCheckbox = document.getElementById('isInterestOnly');
+        const loanTermMonthsInput = document.getElementById('loanTermMonths');
+
+        // 儲存貸款申請的陣列 (僅存在於記憶體，不持久化)
+        let loanApplications = [];
+
+        // 根據狀態設定標籤顏色 (僅用於顯示)
+        function getStatusColorClass(status) {
+            switch (status) {
+                case '待處理': return 'bg-yellow-100 text-yellow-800';
+                case '審核中': return 'bg-blue-100 text-blue-800';
+                case '已批准': return 'bg-green-100 text-green-800';
+                case '已拒絕': return 'bg-red-100 text-red-800';
+                case '已撥款': return 'bg-purple-100 text-purple-800';
+                default: return 'bg-gray-100 text-gray-800';
+            }
         }
 
-        // Mount the React app to the root div
-        const domContainer = document.querySelector('#root');
-        const root = ReactDOM.createRoot(domContainer);
-        root.render(<App />);
+        /**
+         * 計算月繳金額的函數 (僅用於顯示)
+         */
+        function calculateMonthlyPayment(principal, rate, term, ratePeriod, isInterestOnly) {
+            if (principal <= 0) return 0;
+            let effectiveMonthlyRate = (rate / 100);
+            switch (ratePeriod) {
+                case 'annual': effectiveMonthlyRate /= 12; break;
+                case 'weekly': effectiveMonthlyRate *= (52 / 12); break;
+                case 'daily': effectiveMonthlyRate *= (365 / 12); break;
+            }
+
+            if (isInterestOnly) {
+                return principal * effectiveMonthlyRate;
+            } else {
+                if (term <= 0) return 0;
+                if (effectiveMonthlyRate === 0) return principal / term;
+                const numerator = principal * effectiveMonthlyRate * Math.pow((1 + effectiveMonthlyRate), term);
+                const denominator = Math.pow((1 + effectiveMonthlyRate), term) - 1;
+                return numerator / denominator;
+            }
+        }
+
+        // 渲染貸款申請到表格
+        function renderApplications() {
+            loanApplicationsTableBody.innerHTML = ''; // 清空表格
+            if (loanApplications.length === 0) {
+                loanApplicationsTableBody.innerHTML = `<tr><td colspan="10" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">沒有資料</td></tr>`;
+                return;
+            }
+
+            loanApplications.forEach(app => {
+                const newRow = document.createElement('tr');
+                newRow.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${app.customerName}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${parseFloat(app.loanAmount).toLocaleString('zh-TW', { style: 'currency', currency: 'TWD' })}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${app.interestRate}% (${app.interestRatePeriod === 'annual' ? '年' : app.interestRatePeriod === 'monthly' ? '月' : app.interestRatePeriod === 'weekly' ? '週' : '日'})</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${app.isInterestOnly ? '純繳利息' : app.loanTermMonths}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${parseFloat(app.monthlyPayment).toLocaleString('zh-TW', { style: 'currency', currency: 'TWD', minimumFractionDigits: 0, maximumFractionDigits: 0 })}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${app.contactPhone}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${app.contactEmail}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColorClass(app.applicationStatus)}">${app.applicationStatus}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${app.notes}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button class="text-gray-400 cursor-not-allowed mr-2">編輯</button>
+                        <button class="text-gray-400 cursor-not-allowed">刪除</button>
+                    </td>
+                `;
+                loanApplicationsTableBody.appendChild(newRow);
+            });
+        }
+
+        // 根據「純繳利息」選項切換「貸款期數」的禁用狀態
+        function toggleLoanTermInput(isInterestOnlyChecked, targetInput) {
+            if (isInterestOnlyChecked) {
+                targetInput.value = '';
+                targetInput.disabled = true;
+                targetInput.classList.add('bg-gray-100');
+            } else {
+                targetInput.disabled = false;
+                targetInput.classList.remove('bg-gray-100');
+            }
+        }
+
+        // 監聽表單提交事件 (僅新增到記憶體，不持久化)
+        loanApplicationForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const loanAmount = parseFloat(loanAmountInput.value) || 0;
+            const interestRate = parseFloat(interestRateInput.value) || 0;
+            const loanTermMonths = parseInt(loanTermMonthsInput.value) || 0;
+            const interestRatePeriod = interestRatePeriodSelect.value;
+            const isInterestOnly = isInterestOnlyCheckbox.checked;
+
+            const monthlyPayment = calculateMonthlyPayment(loanAmount, interestRate, loanTermMonths, interestRatePeriod, isInterestOnly);
+
+            const newApplication = {
+                customerName: document.getElementById('customerName').value,
+                loanAmount: loanAmount,
+                interestRate: interestRate,
+                interestRatePeriod: interestRatePeriod,
+                isInterestOnly: isInterestOnly,
+                loanTermMonths: loanTermMonths,
+                monthlyPayment: monthlyPayment,
+                contactPhone: document.getElementById('contactPhone').value,
+                contactEmail: document.getElementById('contactEmail').value,
+                applicationStatus: document.getElementById('applicationStatus').value,
+                notes: document.getElementById('notes').value,
+            };
+
+            loanApplications.push(newApplication); // 新增到記憶體陣列
+            renderApplications(); // 重新渲染列表
+            loanApplicationForm.reset(); // 清空表單
+
+            // 重置純繳利息選項
+            isInterestOnlyCheckbox.checked = false;
+            toggleLoanTermInput(false, loanTermMonthsInput);
+
+            // 靜態版中不實際儲存或顯示訊息
+            // showMessageBox("貸款申請已新增 (僅本機記憶體)！");
+        });
+
+        // 監聽純繳利息選項，切換期數輸入框狀態
+        isInterestOnlyCheckbox.addEventListener('change', () => {
+            toggleLoanTermInput(isInterestOnlyCheckbox.checked, loanTermMonthsInput);
+        });
+
+        // 初始渲染
+        document.addEventListener('DOMContentLoaded', () => {
+            renderApplications();
+            // 頁面載入時，根據預設的「純繳利息」狀態初始化「貸款期數」輸入框
+            toggleLoanTermInput(isInterestOnlyCheckbox.checked, loanTermMonthsInput);
+
+            // 靜態版中編輯模態視窗的關閉按鈕
+            const modalCloseButton = editModal.querySelector('.close-button');
+            if(modalCloseButton) modalCloseButton.addEventListener('click', () => { editModal.style.display = 'none'; });
+
+            // 靜態版中訊息框的關閉按鈕
+            const messageBoxButton = messageBox.querySelector('button');
+            if(messageBoxButton) messageBoxButton.addEventListener('click', () => { messageBox.style.display = 'none'; });
+        });
     </script>
 </body>
 </html>
