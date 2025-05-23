@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>小額貸款CRM (靜態版)</title>
+    <title>小額貸款CRM</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* 自訂字體 */
@@ -16,17 +16,17 @@
             padding: 0.75rem 1rem;
             text-align: left;
         }
-        /* 模態視窗樣式 (靜態版中此功能將不活躍) */
+        /* 模態視窗樣式 */
         .modal {
             display: none; /* 預設隱藏 */
-            position: fixed;
-            z-index: 1000;
+            position: fixed; /* 固定位置 */
+            z-index: 1000; /* 疊在其他元素之上 */
             left: 0;
             top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0,0,0,0.4);
+            width: 100%; /* 寬度佔滿 */
+            height: 100%; /* 高度佔滿 */
+            overflow: auto; /* 允許滾動 */
+            background-color: rgba(0,0,0,0.4); /* 半透明黑色背景 */
             justify-content: center;
             align-items: center;
         }
@@ -45,7 +45,37 @@
             font-size: 28px;
             font-weight: bold;
         }
-        /* Message box (靜態版中此功能將不活躍) */
+        .close-button:hover,
+        .close-button:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        /* Loading overlay */
+        .loading-overlay {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            z-index: 1001;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #be123c; /* 酒紅色 spinner (rose-700) */
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        /* Message box */
         .message-box {
             display: none;
             position: fixed;
@@ -59,13 +89,119 @@
             z-index: 1002;
             text-align: center;
         }
+        .message-box button {
+            margin-top: 15px;
+            padding: 8px 16px;
+            background-color: #be123c; /* 酒紅色按鈕 (rose-700) */
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        /* Custom Animations */
+        .fade-in-up {
+            animation: fadeInUp 0.8s ease-out forwards;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        @keyframes fadeInUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.8s ease-out forwards;
+            opacity: 0;
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+
+        /* Table row hover effect */
+        .table-row-hover:hover {
+            background-color: #fce7f3; /* rose-100 on hover */
+            transition: background-color 0.2s ease-in-out;
+        }
     </style>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, setDoc, deleteDoc, onSnapshot, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // 全域變數 (由 Canvas 環境提供)
+        // IMPORTANT: If you are running this code outside of a Canvas environment,
+        // you will need to replace these with your actual Firebase project config.
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        // initialAuthToken is not used for Google Sign-In, but kept for consistency if needed for other auth methods.
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // 初始化 Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // 將 Firebase 相關物件掛載到 window 物件，以便在主腳本中存取
+        window.db = db;
+        window.auth = auth;
+        window.appId = appId;
+        window.collection = collection;
+        window.addDoc = addDoc;
+        window.setDoc = setDoc;
+        window.deleteDoc = deleteDoc;
+        window.onSnapshot = onSnapshot;
+        window.doc = doc;
+        window.signInAnonymously = signInAnonymously;
+        window.onAuthStateChanged = onAuthStateChanged;
+    </script>
 </head>
 <body class="p-4 sm:p-6 md:p-8 lg:p-10">
-    <div class="max-w-6xl mx-auto bg-white p-6 rounded-lg shadow-xl">
-        <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">小額貸款客戶關係管理系統 (靜態展示版)</h1>
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <p class="ml-3 text-gray-700">載入中...</p>
+    </div>
 
-        <div class="mb-10 p-6 bg-rose-50 rounded-lg shadow-md">
+    <div id="messageBox" class="message-box">
+        <p id="messageText"></p>
+        <button onclick="closeMessageBox()">確定</button>
+    </div>
+
+    <div id="homepage" class="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-xl text-center" style="display: none;">
+        <h1 class="text-4xl font-bold text-rose-800 mb-6 fade-in-up">歡迎來到小額貸款CRM系統</h1>
+        <p class="text-lg text-gray-700 mb-8 fade-in-up" style="animation-delay: 0.2s;">
+            輕鬆管理您的貸款申請和客戶關係，提高效率，優化客戶服務。
+        </p>
+        <img src="https://placehold.co/200x200/fce7f3/be123c?text=CRM" onerror="this.onerror=null;this.src='https://placehold.co/200x200/fce7f3/be123c?text=CRM';" alt="CRM Icon" class="mx-auto my-8 fade-in" style="animation-delay: 0.4s;">
+        <button id="goToCrmButton"
+                class="inline-flex items-center px-8 py-4 border border-transparent text-lg font-medium rounded-md shadow-sm text-white bg-rose-700 hover:bg-rose-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-700 transition duration-150 ease-in-out transform hover:scale-105 fade-in-up" style="animation-delay: 0.6s;">
+            進入CRM管理
+        </button>
+    </div>
+
+    <div id="crmFormAndNewApps" class="max-w-6xl mx-auto bg-white p-6 rounded-lg shadow-xl" style="display: none;">
+        <div class="flex justify-between items-center mb-8 relative">
+            <h1 class="text-3xl font-bold text-gray-800 fade-in-up">小額貸款CRM管理</h1>
+            <div class="flex items-center space-x-2">
+                <p id="userIdDisplay" class="text-sm text-gray-600 fade-in-up" style="animation-delay: 0.2s;">使用者 ID: 載入中...</p>
+                <button id="goToCustomerListsButton"
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-rose-600 hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500 transition duration-150 ease-in-out transform hover:scale-105">
+                    查看客戶列表
+                </button>
+                <button id="goToHomepageButtonFromCrm"
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition duration-150 ease-in-out transform hover:scale-105">
+                    回首頁
+                </button>
+            </div>
+        </div>
+
+        <div class="mb-10 p-6 bg-rose-50 rounded-lg shadow-md fade-in-up" style="animation-delay: 0.8s;">
             <h2 class="text-2xl font-semibold text-rose-900 mb-6">新增貸款申請</h2>
             <form id="loanApplicationForm" class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -130,15 +266,15 @@
                 </div>
                 <div class="md:col-span-2 flex justify-end">
                     <button type="submit"
-                            class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-rose-700 hover:bg-rose-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-700 transition duration-150 ease-in-out">
+                            class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-rose-700 hover:bg-rose-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-700 transition duration-150 ease-in-out transform hover:scale-105">
                         新增申請
                     </button>
                 </div>
             </form>
         </div>
 
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-2xl font-semibold text-gray-800 mb-6">貸款申請列表</h2>
+        <div class="bg-white p-6 rounded-lg shadow-md mb-10 fade-in-up" style="animation-delay: 1.2s;">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-6">新申請與審核中列表</h2>
             <div class="overflow-x-auto rounded-lg border border-gray-200">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
@@ -161,37 +297,187 @@
                         </tbody>
                 </table>
             </div>
+            <div class="flex justify-between items-center mt-4">
+                <button id="prevNewApp" class="px-4 py-2 bg-rose-700 text-white rounded-md hover:bg-rose-800 disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 ease-in-out transform hover:scale-105">上一頁</button>
+                <span class="text-sm text-gray-700">第 <span id="currentPageNewApp">1</span> 頁，共 <span id="totalPagesNewApp">1</span> 頁</span>
+                <button id="nextNewApp" class="px-4 py-2 bg-rose-700 text-white rounded-md hover:bg-rose-800 disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 ease-in-out transform hover:scale-105">下一頁</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="customerListsPage" class="max-w-6xl mx-auto bg-white p-6 rounded-lg shadow-xl" style="display: none;">
+        <div class="flex justify-between items-center mb-8 relative">
+            <h1 class="text-3xl font-bold text-gray-800 fade-in-up">客戶列表</h1>
+            <div class="flex items-center space-x-2">
+                <p class="text-sm text-gray-600 fade-in-up" style="animation-delay: 0.2s;">使用者 ID: 載入中...</p>
+                <button id="goToCrmFormButton"
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-rose-600 hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500 transition duration-150 ease-in-out transform hover:scale-105">
+                    返回CRM管理
+                </button>
+                <button id="goToHomepageButtonFromLists"
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition duration-150 ease-in-out transform hover:scale-105">
+                    回首頁
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-md fade-in-up" style="animation-delay: 0.8s;">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-6">已配合客戶列表</h2>
+            <div class="overflow-x-auto rounded-lg border border-gray-200">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">客戶姓名</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">貸款金額</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">利率</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">期數（月）</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">月繳金額</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">聯絡電話</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">電子郵件</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">申請狀態</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">備註</th>
+                            <th scope="col" class="relative px-6 py-3">
+                                <span class="sr-only">操作</span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="cooperatingCustomersTableBody" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                </table>
+            </div>
+            <div class="flex justify-between items-center mt-4">
+                <button id="prevCoopCust" class="px-4 py-2 bg-rose-700 text-white rounded-md hover:bg-rose-800 disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 ease-in-out transform hover:scale-105">上一頁</button>
+                <span class="text-sm text-gray-700">第 <span id="currentPageCoopCust">1</span> 頁，共 <span id="totalPagesCoopCust">1</span> 頁</span>
+                <button id="nextCoopCust" class="px-4 py-2 bg-rose-700 text-white rounded-md hover:bg-rose-800 disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 ease-in-out transform hover:scale-105">下一頁</button>
+            </div>
         </div>
     </div>
 
     <div id="editModal" class="modal">
         <div class="modal-content">
-            <span class="close-button">&times;</span>
-            <h3 class="text-xl font-semibold text-gray-800 mb-4">編輯貸款申請 (無功能)</h3>
-            <p class="text-gray-600">此為靜態展示版，編輯功能未啟用。</p>
-            <div class="flex justify-end mt-4">
-                <button type="button" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-400">
-                    關閉
-                </button>
-            </div>
+            <span class="close-button" onclick="closeEditModal()">&times;</span>
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">編輯貸款申請</h3>
+            <form id="editApplicationForm" class="grid grid-cols-1 gap-4">
+                <input type="hidden" id="editApplicationId">
+                <div>
+                    <label for="editCustomerName" class="block text-sm font-medium text-gray-700 mb-1">客戶姓名</label>
+                    <input type="text" id="editCustomerName" name="customerName"
+                           class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md" readonly>
+                </div>
+                <div>
+                    <label for="editLoanAmount" class="block text-sm font-medium text-gray-700 mb-1">貸款金額</label>
+                    <input type="text" id="editLoanAmount" name="loanAmount"
+                           class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md" readonly>
+                </div>
+                <div>
+                    <label for="editInterestRate" class="block text-sm font-medium text-gray-700 mb-1">利率</label>
+                    <div class="flex mt-1">
+                        <input type="number" id="editInterestRate" name="interestRate"
+                               class="block w-2/3 px-4 py-2 border border-gray-300 rounded-l-md" min="0" step="0.01">
+                        <select id="editInterestRatePeriod" name="interestRatePeriod"
+                                class="block w-1/3 px-2 py-2 border border-gray-300 rounded-r-md">
+                            <option value="annual">年 (%)</option>
+                            <option value="monthly">月 (%)</option>
+                            <option value="weekly">週 (%)</option>
+                            <option value="daily">日 (%)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex items-center mt-1">
+                    <input type="checkbox" id="editIsInterestOnly" name="isInterestOnly"
+                           class="h-4 w-4 text-rose-700 border-gray-300 rounded">
+                    <label for="editIsInterestOnly" class="ml-2 block text-sm font-medium text-gray-700">純繳利息</label>
+                </div>
+                <div>
+                    <label for="editLoanTermMonths" class="block text-sm font-medium text-gray-700 mb-1">貸款期數（月）</label>
+                    <input type="number" id="editLoanTermMonths" name="loanTermMonths"
+                           class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md" min="1">
+                </div>
+                <div>
+                    <label for="editMonthlyPayment" class="block text-sm font-medium text-gray-700 mb-1">月繳金額</label>
+                    <input type="text" id="editMonthlyPayment" name="monthlyPayment"
+                           class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-100" readonly>
+                </div>
+                <div>
+                    <label for="editContactPhone" class="block text-sm font-medium text-gray-700 mb-1">聯絡電話</label>
+                    <input type="tel" id="editContactPhone" name="contactPhone"
+                           class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md">
+                </div>
+                <div>
+                    <label for="editContactEmail" class="block text-sm font-medium text-gray-700 mb-1">電子郵件</label>
+                    <input type="email" id="editContactEmail" name="contactEmail"
+                           class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md">
+                </div>
+                <div>
+                    <label for="editApplicationStatus" class="block text-sm font-medium text-gray-700 mb-1">申請狀態</label>
+                    <select id="editApplicationStatus" name="applicationStatus"
+                            class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md">
+                        <option value="待處理">待處理</option>
+                        <option value="審核中">審核中</option>
+                        <option value="已批准">已批准</option>
+                        <option value="已拒絕">已拒絕</option>
+                        <option value="已撥款">已撥款</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="editNotes" class="block text-sm font-medium text-gray-700 mb-1">備註</label>
+                    <textarea id="editNotes" name="notes" rows="3"
+                              class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md"></textarea>
+                </div>
+                <div class="flex justify-end mt-4">
+                    <button type="button" onclick="saveEditedApplication()"
+                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-rose-700 hover:bg-rose-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-700 transition duration-150 ease-in-out transform hover:scale-105">
+                        儲存
+                    </button>
+                    <button type="button" onclick="closeEditModal()"
+                            class="ml-3 inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out transform hover:scale-105">
+                        取消
+                    </button>
+                </div>
+            </form>
         </div>
-    </div>
-
-    <div id="messageBox" class="message-box">
-        <p>此為靜態展示版，訊息提示功能未啟用。</p>
-        <button>確定</button>
     </div>
 
     <footer class="text-center text-gray-500 text-sm mt-10 p-4">
         &copy; 2025 龐資財富管理 版權所有.
     </footer>
 
-    <script>
+    <script type="module">
+        // 確保 Firebase 相關物件已載入
+        const db = window.db;
+        const auth = window.auth;
+        const signInAnonymously = window.signInAnonymously; // Use anonymous sign-in
+        const onAuthStateChanged = window.onAuthStateChanged;
+        const appId = window.appId;
+        const collection = window.collection;
+        const addDoc = window.addDoc;
+        const setDoc = window.setDoc;
+        const deleteDoc = window.deleteDoc;
+        const onSnapshot = window.onSnapshot;
+        const doc = window.doc;
+
         // 獲取元素
+        const homepageSection = document.getElementById('homepage');
+        const crmFormAndNewAppsSection = document.getElementById('crmFormAndNewApps');
+        const customerListsPageSection = document.getElementById('customerListsPage');
+
+        // 導航按鈕 (在 DOMContentLoaded 後獲取並綁定事件)
+        let goToCrmButton;
+        let goToCustomerListsButton;
+        let goToCrmFormButton;
+        let goToHomepageButtonFromCrm;
+        let goToHomepageButtonFromLists;
+
         const loanApplicationForm = document.getElementById('loanApplicationForm');
         const loanApplicationsTableBody = document.getElementById('loanApplicationsTableBody');
+        const cooperatingCustomersTableBody = document.getElementById('cooperatingCustomersTableBody');
         const editModal = document.getElementById('editModal');
+        const editApplicationForm = document.getElementById('editApplicationForm');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const userIdDisplay = document.getElementById('userIdDisplay');
+
         const messageBox = document.getElementById('messageBox');
+        const messageText = document.getElementById('messageText');
 
         // 表單元素
         const loanAmountInput = document.getElementById('loanAmount');
@@ -200,10 +486,56 @@
         const isInterestOnlyCheckbox = document.getElementById('isInterestOnly');
         const loanTermMonthsInput = document.getElementById('loanTermMonths');
 
-        // 儲存貸款申請的陣列 (僅存在於記憶體，不持久化)
-        let loanApplications = [];
+        // 編輯模態視窗元素
+        const editInterestRateInput = document.getElementById('editInterestRate');
+        const editInterestRatePeriodSelect = document.getElementById('editInterestRatePeriod');
+        const editIsInterestOnlyCheckbox = document.getElementById('editIsInterestOnly');
+        const editLoanTermMonthsInput = document.getElementById('editLoanTermMonths');
+        const editMonthlyPaymentInput = document.getElementById('editMonthlyPayment');
 
-        // 根據狀態設定標籤顏色 (僅用於顯示)
+        // 分頁元素
+        const prevNewAppBtn = document.getElementById('prevNewApp');
+        const nextNewAppBtn = document.getElementById('nextNewApp');
+        const currentPageNewAppSpan = document.getElementById('currentPageNewApp');
+        const totalPagesNewAppSpan = document.getElementById('totalPagesNewApp');
+
+        const prevCoopCustBtn = document.getElementById('prevCoopCust');
+        const nextCoopCustBtn = document.getElementById('nextCoopCust');
+        const currentPageCoopCustSpan = document.getElementById('currentPageCoopCust');
+        const totalPagesCoopCustSpan = document.getElementById('totalPagesCoopCust');
+
+        // 儲存所有貸款申請的陣列
+        let loanApplications = [];
+        let currentUserId = null; // 用於儲存 Firebase 使用者 ID
+        let unsubscribeFirestore = null; // 用於儲存 Firestore 監聽器的取消函數
+
+        // 分頁狀態
+        const itemsPerPage = 5; // 每頁顯示的項目數量
+        let currentPageNewApp = 1;
+        let currentPageCoopCust = 1;
+
+        // 顯示訊息框
+        function showMessageBox(message) {
+            messageText.textContent = message;
+            messageBox.style.display = 'block';
+        }
+
+        // 關閉訊息框
+        window.closeMessageBox = function() {
+            messageBox.style.display = 'none';
+        }
+
+        // 顯示載入中
+        function showLoading() {
+            loadingOverlay.style.display = 'flex';
+        }
+
+        // 隱藏載入中
+        function hideLoading() {
+            loadingOverlay.style.display = 'none';
+        }
+
+        // 根據狀態設定標籤顏色
         function getStatusColorClass(status) {
             switch (status) {
                 case '待處理': return 'bg-yellow-100 text-yellow-800';
@@ -216,57 +548,152 @@
         }
 
         /**
-         * 計算月繳金額的函數 (僅用於顯示)
+         * 計算月繳金額的函數
+         * @param {number} principal - 貸款本金
+         * @param {number} rate - 輸入的利率值 (例如：5 代表 5%)
+         * @param {number} term - 貸款期數 (月)
+         * @param {string} ratePeriod - 利率週期 ('annual', 'monthly', 'weekly', 'daily')
+         * @param {boolean} isInterestOnly - 是否為純繳利息
+         * @returns {number} 月繳金額
          */
         function calculateMonthlyPayment(principal, rate, term, ratePeriod, isInterestOnly) {
-            if (principal <= 0) return 0;
-            let effectiveMonthlyRate = (rate / 100);
+            if (principal <= 0) {
+                return 0;
+            }
+
+            let effectiveMonthlyRate = 0; // 月利率
+            const rateDecimal = rate / 100; // 將百分比轉換為小數
+
             switch (ratePeriod) {
-                case 'annual': effectiveMonthlyRate /= 12; break;
-                case 'weekly': effectiveMonthlyRate *= (52 / 12); break;
-                case 'daily': effectiveMonthlyRate *= (365 / 12); break;
+                case 'annual':
+                    effectiveMonthlyRate = rateDecimal / 12;
+                    break;
+                case 'monthly':
+                    effectiveMonthlyRate = rateDecimal;
+                    break;
+                case 'weekly':
+                    // 假設一年 52 週，一個月約 52/12 週
+                    effectiveMonthlyRate = rateDecimal * (52 / 12);
+                    break;
+                case 'daily':
+                    // 假設一年 365 天，一個月約 365/12 天
+                    effectiveMonthlyRate = rateDecimal * (365 / 12);
+                    break;
+                default:
+                    effectiveMonthlyRate = 0; // 預設為零
             }
 
             if (isInterestOnly) {
+                // 純繳利息：月繳金額 = 本金 * 月利率
                 return principal * effectiveMonthlyRate;
             } else {
-                if (term <= 0) return 0;
-                if (effectiveMonthlyRate === 0) return principal / term;
+                // 一般攤還型貸款
+                if (term <= 0) {
+                    return 0; // 期數無效
+                }
+                if (effectiveMonthlyRate === 0) { // 零利率情況
+                    return principal / term;
+                }
+                // 月繳金額計算公式: M = P [ i(1 + i)^n ] / [ (1 + i)^n – 1]
                 const numerator = principal * effectiveMonthlyRate * Math.pow((1 + effectiveMonthlyRate), term);
                 const denominator = Math.pow((1 + effectiveMonthlyRate), term) - 1;
                 return numerator / denominator;
             }
         }
 
-        // 渲染貸款申請到表格
-        function renderApplications() {
-            loanApplicationsTableBody.innerHTML = ''; // 清空表格
-            if (loanApplications.length === 0) {
-                loanApplicationsTableBody.innerHTML = `<tr><td colspan="10" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">沒有資料</td></tr>`;
+        // 渲染資料到指定的表格
+        function displayTableData(data, tableBodyElement) {
+            tableBodyElement.innerHTML = ''; // 清空表格
+
+            if (data.length === 0) {
+                const noDataRow = document.createElement('tr');
+                noDataRow.innerHTML = `<td colspan="10" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">沒有資料</td>`;
+                tableBodyElement.appendChild(noDataRow);
                 return;
             }
 
-            loanApplications.forEach(app => {
+            data.forEach(app => {
                 const newRow = document.createElement('tr');
+                newRow.setAttribute('data-id', app.id);
+                newRow.classList.add('table-row-hover');
+
+                const formattedLoanAmount = parseFloat(app.loanAmount).toLocaleString('zh-TW', { style: 'currency', currency: 'TWD' });
+                const formattedMonthlyPayment = parseFloat(app.monthlyPayment).toLocaleString('zh-TW', { style: 'currency', currency: 'TWD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+                const statusColorClass = getStatusColorClass(app.applicationStatus);
+
+                let interestRateDisplay = `${app.interestRate}% `;
+                switch (app.interestRatePeriod) {
+                    case 'annual': interestRateDisplay += '(年)'; break;
+                    case 'monthly': interestRateDisplay += '(月)'; break;
+                    case 'weekly': interestRateDisplay += '(週)'; break;
+                    case 'daily': interestRateDisplay += '(日)'; break;
+                }
+
+                const loanTermDisplay = app.isInterestOnly ? '純繳利息' : app.loanTermMonths;
+
                 newRow.innerHTML = `
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${app.customerName}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${parseFloat(app.loanAmount).toLocaleString('zh-TW', { style: 'currency', currency: 'TWD' })}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${app.interestRate}% (${app.interestRatePeriod === 'annual' ? '年' : app.interestRatePeriod === 'monthly' ? '月' : app.interestRatePeriod === 'weekly' ? '週' : '日'})</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${app.isInterestOnly ? '純繳利息' : app.loanTermMonths}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${parseFloat(app.monthlyPayment).toLocaleString('zh-TW', { style: 'currency', currency: 'TWD', minimumFractionDigits: 0, maximumFractionDigits: 0 })}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formattedLoanAmount}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${interestRateDisplay}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${loanTermDisplay}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formattedMonthlyPayment}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${app.contactPhone}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${app.contactEmail}</td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColorClass(app.applicationStatus)}">${app.applicationStatus}</span>
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColorClass}">${app.applicationStatus}</span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${app.notes}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button class="text-gray-400 cursor-not-allowed mr-2">編輯</button>
-                        <button class="text-gray-400 cursor-not-allowed">刪除</button>
+                        <button onclick="openEditModal('${app.id}')" class="text-rose-700 hover:text-rose-950 mr-2 transform hover:scale-110 transition duration-150 ease-in-out">編輯</button>
+                        <button onclick="deleteApplication('${app.id}')" class="text-rose-700 hover:text-rose-950 transform hover:scale-110 transition duration-150 ease-in-out">刪除</button>
                     </td>
                 `;
-                loanApplicationsTableBody.appendChild(newRow);
+                tableBodyElement.appendChild(newRow);
             });
+        }
+
+        // 更新分頁控制按鈕狀態和頁碼顯示
+        function updatePaginationControls(currentPage, totalPages, prevBtn, nextBtn, currentPageSpan, totalPagesSpan) {
+            prevBtn.disabled = (currentPage === 1);
+            nextBtn.disabled = (currentPage === totalPages || totalPages === 0);
+            currentPageSpan.textContent = currentPage;
+            totalPagesSpan.textContent = totalPages;
+        }
+
+        // 渲染所有貸款申請到對應的表格 (含分頁邏輯)
+        function renderAllApplications() {
+            const newApplications = loanApplications.filter(app => app.applicationStatus !== '已撥款');
+            const cooperatingCustomers = loanApplications.filter(app => app.applicationStatus === '已撥款');
+
+            // 計算新申請列表分頁資訊
+            const totalNewAppPages = Math.ceil(newApplications.length / itemsPerPage);
+            if (currentPageNewApp > totalNewAppPages && totalNewAppPages > 0) {
+                currentPageNewApp = totalNewAppPages;
+            } else if (totalNewAppPages === 0) {
+                currentPageNewApp = 1;
+            }
+            const startIndexNewApp = (currentPageNewApp - 1) * itemsPerPage;
+            const endIndexNewApp = startIndexNewApp + itemsPerPage;
+            const paginatedNewApplications = newApplications.slice(startIndexNewApp, endIndexNewApp);
+
+            // 計算已配合客戶列表分頁資訊
+            const totalCoopCustPages = Math.ceil(cooperatingCustomers.length / itemsPerPage);
+            if (currentPageCoopCust > totalCoopCustPages && totalCoopCustPages > 0) {
+                currentPageCoopCust = totalCoopCustPages;
+            } else if (totalCoopCustPages === 0) {
+                currentPageCoopCust = 1;
+            }
+            const startIndexCoopCust = (currentPageCoopCust - 1) * itemsPerPage;
+            const endIndexCoopCust = startIndexCoopCust + itemsPerPage;
+            const paginatedCooperatingCustomers = cooperatingCustomers.slice(startIndexCoopCust, endIndexCoopCust);
+
+            // 顯示資料
+            displayTableData(paginatedNewApplications, loanApplicationsTableBody);
+            displayTableData(paginatedCooperatingCustomers, cooperatingCustomersTableBody);
+
+            // 更新分頁控制
+            updatePaginationControls(currentPageNewApp, totalNewAppPages, prevNewAppBtn, nextNewAppBtn, currentPageNewAppSpan, totalPagesNewAppSpan);
+            updatePaginationControls(currentPageCoopCust, totalCoopCustPages, prevCoopCustBtn, nextCoopCustBtn, currentPageCoopCustSpan, totalPagesCoopCustSpan);
         }
 
         // 根據「純繳利息」選項切換「貸款期數」的禁用狀態
@@ -274,22 +701,60 @@
             if (isInterestOnlyChecked) {
                 targetInput.value = '';
                 targetInput.disabled = true;
+                targetInput.required = false;
                 targetInput.classList.add('bg-gray-100');
             } else {
                 targetInput.disabled = false;
+                targetInput.required = true;
                 targetInput.classList.remove('bg-gray-100');
             }
         }
 
-        // 監聽表單提交事件 (僅新增到記憶體，不持久化)
-        loanApplicationForm.addEventListener('submit', function(event) {
+        // 監聽新增表單中的「純繳利息」選項變化
+        isInterestOnlyCheckbox.addEventListener('change', () => {
+            toggleLoanTermInput(isInterestOnlyCheckbox.checked, loanTermMonthsInput);
+            updateNewFormMonthlyPayment();
+        });
+
+        // 監聽新增表單中的利率、期數、貸款金額變化，即時更新月繳金額
+        loanAmountInput.addEventListener('input', updateNewFormMonthlyPayment);
+        interestRateInput.addEventListener('input', updateNewFormMonthlyPayment);
+        interestRatePeriodSelect.addEventListener('change', updateNewFormMonthlyPayment);
+        loanTermMonthsInput.addEventListener('input', updateNewFormMonthlyPayment);
+
+        // 新增表單的月繳金額計算 (不顯示在表單上，只在內部計算)
+        function updateNewFormMonthlyPayment() {
+            const loanAmountVal = parseFloat(loanAmountInput.value) || 0;
+            const interestRateVal = parseFloat(interestRateInput.value) || 0;
+            const loanTermMonthsVal = parseInt(loanTermMonthsInput.value) || 0;
+            const interestRatePeriodVal = interestRatePeriodSelect.value;
+            const isInterestOnlyVal = isInterestOnlyCheckbox.checked;
+
+            const termForCalc = isInterestOnlyVal ? 1 : loanTermMonthsVal;
+
+            calculateMonthlyPayment(
+                loanAmountVal,
+                interestRateVal,
+                termForCalc,
+                interestRatePeriodVal,
+                isInterestOnlyVal
+            );
+        }
+
+        // 監聽表單提交事件
+        loanApplicationForm.addEventListener('submit', async function(event) {
             event.preventDefault();
 
-            const loanAmount = parseFloat(loanAmountInput.value) || 0;
-            const interestRate = parseFloat(interestRateInput.value) || 0;
-            const loanTermMonths = parseInt(loanTermMonthsInput.value) || 0;
+            if (!currentUserId) {
+                showMessageBox("系統初始化中，請稍候再試。");
+                return;
+            }
+
+            const loanAmount = parseFloat(loanAmountInput.value);
+            const interestRate = parseFloat(interestRateInput.value);
             const interestRatePeriod = interestRatePeriodSelect.value;
             const isInterestOnly = isInterestOnlyCheckbox.checked;
+            const loanTermMonths = parseInt(loanTermMonthsInput.value) || (isInterestOnly ? 0 : 1);
 
             const monthlyPayment = calculateMonthlyPayment(loanAmount, interestRate, loanTermMonths, interestRatePeriod, isInterestOnly);
 
@@ -305,39 +770,283 @@
                 contactEmail: document.getElementById('contactEmail').value,
                 applicationStatus: document.getElementById('applicationStatus').value,
                 notes: document.getElementById('notes').value,
+                createdAt: new Date().toISOString()
             };
 
-            loanApplications.push(newApplication); // 新增到記憶體陣列
-            renderApplications(); // 重新渲染列表
-            loanApplicationForm.reset(); // 清空表單
+            try {
+                await addDoc(collection(db, `artifacts/${appId}/users/${currentUserId}/loanApplications`), newApplication);
+                showMessageBox("貸款申請已成功新增！");
+            } catch (e) {
+                console.error("Error adding document: ", e);
+                showMessageBox(`新增申請失敗: ${e.message}`);
+            }
 
-            // 重置純繳利息選項
+            loanApplicationForm.reset();
             isInterestOnlyCheckbox.checked = false;
             toggleLoanTermInput(false, loanTermMonthsInput);
-
-            // 靜態版中不實際儲存或顯示訊息
-            // showMessageBox("貸款申請已新增 (僅本機記憶體)！");
         });
 
-        // 監聽純繳利息選項，切換期數輸入框狀態
-        isInterestOnlyCheckbox.addEventListener('change', () => {
+        // 開啟編輯模態視窗
+        window.openEditModal = function(id) {
+            const appToEdit = loanApplications.find(app => app.id === id);
+            if (appToEdit) {
+                document.getElementById('editApplicationId').value = appToEdit.id;
+                document.getElementById('editCustomerName').value = appToEdit.customerName;
+                document.getElementById('editLoanAmount').value = parseFloat(appToEdit.loanAmount).toLocaleString('zh-TW', { style: 'currency', currency: 'TWD' });
+                document.getElementById('editInterestRate').value = appToEdit.interestRate;
+                document.getElementById('editInterestRatePeriod').value = appToEdit.interestRatePeriod;
+                document.getElementById('editIsInterestOnly').checked = appToEdit.isInterestOnly;
+                document.getElementById('editLoanTermMonths').value = appToEdit.loanTermMonths;
+                document.getElementById('editContactPhone').value = appToEdit.contactPhone;
+                document.getElementById('editContactEmail').value = appToEdit.contactEmail;
+                document.getElementById('editApplicationStatus').value = appToEdit.applicationStatus;
+                document.getElementById('editNotes').value = appToEdit.notes;
+
+                toggleLoanTermInput(editIsInterestOnlyCheckbox.checked, editLoanTermMonthsInput);
+                updateEditMonthlyPayment();
+
+                editInterestRateInput.oninput = updateEditMonthlyPayment;
+                editInterestRatePeriodSelect.onchange = updateEditMonthlyPayment;
+                editIsInterestOnlyCheckbox.onchange = () => {
+                    toggleLoanTermInput(editIsInterestOnlyCheckbox.checked, editLoanTermMonthsInput);
+                    updateEditMonthlyPayment();
+                };
+                editLoanTermMonthsInput.oninput = updateEditMonthlyPayment;
+
+                editModal.style.display = 'flex';
+            }
+        }
+
+        // 更新編輯模態視窗中的月繳金額
+        function updateEditMonthlyPayment() {
+            const currentApp = loanApplications.find(app => app.id === document.getElementById('editApplicationId').value);
+            const loanAmount = parseFloat(currentApp.loanAmount);
+
+            const interestRate = parseFloat(editInterestRateInput.value) || 0;
+            const interestRatePeriod = editInterestRatePeriodSelect.value;
+            const isInterestOnly = editIsInterestOnlyCheckbox.checked;
+            const loanTermMonths = parseInt(editLoanTermMonthsInput.value) || (isInterestOnly ? 0 : 1);
+
+            const monthlyPayment = calculateMonthlyPayment(loanAmount, interestRate, loanTermMonths, interestRatePeriod, isInterestOnly);
+            editMonthlyPaymentInput.value = monthlyPayment.toLocaleString('zh-TW', { style: 'currency', currency: 'TWD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        }
+
+        // 關閉編輯模態視窗
+        window.closeEditModal = function() {
+            editModal.style.display = 'none';
+            editInterestRateInput.oninput = null;
+            editInterestRatePeriodSelect.onchange = null;
+            editIsInterestOnlyCheckbox.onchange = null;
+            editLoanTermMonthsInput.oninput = null;
+        }
+
+        // 儲存編輯後的申請
+        window.saveEditedApplication = async function() {
+            if (!currentUserId) {
+                showMessageBox("系統初始化中，請稍候再試。");
+                return;
+            }
+
+            const id = document.getElementById('editApplicationId').value;
+            const updatedInterestRate = parseFloat(editInterestRateInput.value);
+            const updatedInterestRatePeriod = editInterestRatePeriodSelect.value;
+            const updatedIsInterestOnly = editIsInterestOnlyCheckbox.checked;
+            const updatedLoanTermMonths = parseInt(editLoanTermMonthsInput.value) || (updatedIsInterestOnly ? 0 : 1);
+            const updatedContactPhone = document.getElementById('editContactPhone').value;
+            const updatedContactEmail = document.getElementById('editContactEmail').value;
+            const updatedApplicationStatus = document.getElementById('editApplicationStatus').value;
+            const updatedNotes = document.getElementById('editNotes').value;
+
+            const appIndex = loanApplications.findIndex(app => app.id === id);
+            if (appIndex > -1) {
+                const currentLoanAmount = loanApplications[appIndex].loanAmount;
+
+                const updatedData = {
+                    interestRate: updatedInterestRate,
+                    interestRatePeriod: updatedInterestRatePeriod,
+                    isInterestOnly: updatedIsInterestOnly,
+                    loanTermMonths: updatedLoanTermMonths,
+                    monthlyPayment: calculateMonthlyPayment(
+                        currentLoanAmount,
+                        updatedInterestRate,
+                        updatedLoanTermMonths,
+                        updatedInterestRatePeriod,
+                        updatedIsInterestOnly
+                    ),
+                    contactPhone: updatedContactPhone,
+                    contactEmail: updatedContactEmail,
+                    applicationStatus: updatedApplicationStatus,
+                    notes: updatedNotes
+                };
+
+                try {
+                    await setDoc(doc(db, `artifacts/${appId}/users/${currentUserId}/loanApplications`, id), updatedData, { merge: true });
+                    showMessageBox("貸款申請已成功更新！");
+                } catch (e) {
+                    console.error("Error updating document: ", e);
+                    showMessageBox(`更新申請失敗: ${e.message}`);
+                }
+                closeEditModal();
+            }
+        }
+
+        // 刪除申請
+        window.deleteApplication = async function(id) {
+            if (!currentUserId) {
+                showMessageBox("系統初始化中，請稍候再試。");
+                return;
+            }
+
+            showMessageBox("確定要刪除這筆申請嗎？");
+            messageBox.innerHTML += `<button onclick="confirmDelete('${id}')">確認</button><button onclick="closeMessageBox()" class="ml-3">取消</button>`;
+        }
+
+        // 確認刪除
+        window.confirmDelete = async function(id) {
+            closeMessageBox();
+
+            try {
+                await deleteDoc(doc(db, `artifacts/${appId}/users/${currentUserId}/loanApplications`, id));
+                showMessageBox("貸款申請已成功刪除！");
+            } catch (e) {
+                console.error("Error removing document: ", e);
+                showMessageBox(`刪除申請失敗: ${e.message}`);
+            }
+        }
+
+        // 分頁事件監聽器
+        prevNewAppBtn.addEventListener('click', () => {
+            if (currentPageNewApp > 1) {
+                currentPageNewApp--;
+                renderAllApplications();
+            }
+        });
+
+        nextNewAppBtn.addEventListener('click', () => {
+            const newApplications = loanApplications.filter(app => app.applicationStatus !== '已撥款');
+            const totalNewAppPages = Math.ceil(newApplications.length / itemsPerPage);
+            if (currentPageNewApp < totalNewAppPages) {
+                currentPageNewApp++;
+                renderAllApplications();
+            }
+        });
+
+        prevCoopCustBtn.addEventListener('click', () => {
+            if (currentPageCoopCust > 1) {
+                currentPageCoopCust--;
+                renderAllApplications();
+            }
+        });
+
+        nextCoopCustBtn.addEventListener('click', () => {
+            const cooperatingCustomers = loanApplications.filter(app => app.applicationStatus === '已撥款');
+            const totalCoopCustPages = Math.ceil(cooperatingCustomers.length / itemsPerPage);
+            if (currentPageCoopCust < totalCoopCustPages) {
+                currentPageCoopCust++;
+                renderAllApplications();
+            }
+        });
+
+        // 頁面導航函數
+        function navigateTo(page) {
+            // 先隱藏所有主要區塊
+            homepageSection.style.display = 'none';
+            crmFormAndNewAppsSection.style.display = 'none';
+            customerListsPageSection.style.display = 'none';
+
+            // 顯示請求的區塊
+            if (page === 'homepage') {
+                homepageSection.style.display = 'block';
+            } else if (page === 'crmFormAndNewApps') {
+                // In anonymous mode, we assume user is always authenticated after init
+                crmFormAndNewAppsSection.style.display = 'block';
+                currentPageNewApp = 1;
+                renderAllApplications();
+            } else if (page === 'customerListsPage') {
+                // In anonymous mode, we assume user is always authenticated after init
+                customerListsPageSection.style.display = 'block';
+                currentPageCoopCust = 1;
+                renderAllApplications();
+            }
+        }
+
+        // 初始化 Firebase 和載入資料
+        async function initializeAppAndLoadData() {
+            showLoading(); // 顯示載入中
+
+            // 獲取按鈕元素並綁定事件監聽器
+            // 確保在 DOMContentLoaded 之後獲取元素
+            goToCrmButton = document.getElementById('goToCrmButton');
+            goToCustomerListsButton = document.getElementById('goToCustomerListsButton');
+            goToCrmFormButton = document.getElementById('goToCrmFormButton');
+            goToHomepageButtonFromCrm = document.getElementById('goToHomepageButtonFromCrm');
+            goToHomepageButtonFromLists = document.getElementById('goToHomepageButtonFromLists');
+
+            if (goToCrmButton) goToCrmButton.addEventListener('click', () => navigateTo('crmFormAndNewApps'));
+            if (goToCustomerListsButton) goToCustomerListsButton.addEventListener('click', () => navigateTo('customerListsPage'));
+            if (goToCrmFormButton) goToCrmFormButton.addEventListener('click', () => navigateTo('crmFormAndNewApps'));
+            if (goToHomepageButtonFromCrm) goToHomepageButtonFromCrm.addEventListener('click', () => navigateTo('homepage'));
+            if (goToHomepageButtonFromLists) goToHomepageButtonFromLists.addEventListener('click', () => navigateTo('homepage'));
+
+
+            // 處理 Firebase 認證 (匿名登入)
+            try {
+                // 在匿名模式下，如果沒有現有會話，會自動建立一個匿名用戶
+                await signInAnonymously(auth);
+            } catch (error) {
+                console.error("Firebase authentication error (anonymous):", error);
+                userIdDisplay.textContent = "使用者 ID: 認證失敗";
+                hideLoading();
+                return;
+            }
+
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    currentUserId = user.uid;
+                    userIdDisplay.textContent = `使用者 ID: ${currentUserId}`;
+
+                    if (unsubscribeFirestore) {
+                        unsubscribeFirestore();
+                    }
+
+                    const q = collection(db, `artifacts/${appId}/users/${currentUserId}/loanApplications`);
+                    unsubscribeFirestore = onSnapshot(q, (snapshot) => {
+                        loanApplications = [];
+                        snapshot.forEach((doc) => {
+                            loanApplications.push({ id: doc.id, ...doc.data() });
+                        });
+                        // 僅在CRM內容或客戶列表頁面可見時渲染應用程式，或在初始載入後渲染
+                        if (crmFormAndNewAppsSection.style.display === 'block' || customerListsPageSection.style.display === 'block') {
+                            renderAllApplications();
+                        }
+                        hideLoading();
+                    }, (error) => {
+                        console.error("Error fetching documents from Firestore:", error);
+                        showMessageBox(`載入資料失敗: ${error.message}`);
+                        hideLoading();
+                    });
+                    // 認證成功後，導航到首頁，讓用戶點擊進入CRM
+                    navigateTo('homepage');
+
+                } else {
+                    currentUserId = null;
+                    userIdDisplay.textContent = "使用者 ID: 未登入";
+                    loanApplications = [];
+                    renderAllApplications(); // 清空表格內容
+
+                    if (unsubscribeFirestore) {
+                        unsubscribeFirestore();
+                        unsubscribeFirestore = null;
+                    }
+                    navigateTo('homepage'); // 未認證時，導航到首頁
+                    hideLoading();
+                }
+            });
+
             toggleLoanTermInput(isInterestOnlyCheckbox.checked, loanTermMonthsInput);
-        });
+        }
 
-        // 初始渲染
-        document.addEventListener('DOMContentLoaded', () => {
-            renderApplications();
-            // 頁面載入時，根據預設的「純繳利息」狀態初始化「貸款期數」輸入框
-            toggleLoanTermInput(isInterestOnlyCheckbox.checked, loanTermMonthsInput);
-
-            // 靜態版中編輯模態視窗的關閉按鈕
-            const modalCloseButton = editModal.querySelector('.close-button');
-            if(modalCloseButton) modalCloseButton.addEventListener('click', () => { editModal.style.display = 'none'; });
-
-            // 靜態版中訊息框的關閉按鈕
-            const messageBoxButton = messageBox.querySelector('button');
-            if(messageBoxButton) messageBoxButton.addEventListener('click', () => { messageBox.style.display = 'none'; });
-        });
+        window.onload = initializeAppAndLoadData;
     </script>
 </body>
 </html>
