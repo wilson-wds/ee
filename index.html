@@ -51,7 +51,7 @@
             text-decoration: none;
             cursor: pointer;
         }
-        /* Loading overlay */
+        /* Loading overlay (kept for initial animation, but not for data loading) */
         .loading-overlay {
             display: flex;
             justify-content: center;
@@ -130,37 +130,6 @@
             transition: background-color 0.2s ease-in-out;
         }
     </style>
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, setDoc, deleteDoc, onSnapshot, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Global variables (provided by Canvas environment)
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-
-        // Mount Firebase objects to window for access in other script tags
-        window.firebaseApp = app;
-        window.db = db;
-        window.auth = auth;
-        window.initialAuthToken = initialAuthToken;
-        window.appId = appId; // Mount appId to window as well
-        window.collection = collection; // For use in main script
-        window.addDoc = addDoc;
-        window.setDoc = setDoc;
-        window.deleteDoc = deleteDoc;
-        window.onSnapshot = onSnapshot;
-        window.doc = doc;
-        window.signInAnonymously = signInAnonymously;
-        window.signInWithCustomToken = signInWithCustomToken;
-        window.onAuthStateChanged = onAuthStateChanged;
-    </script>
 </head>
 <body class="p-4 sm:p-6 md:p-8 lg:p-10">
     <div id="loadingOverlay" class="loading-overlay">
@@ -189,19 +158,16 @@
         <div class="flex justify-between items-center mb-8 relative">
             <h1 class="text-3xl font-bold text-gray-800 fade-in-up">小額貸款客戶關係管理系統</h1>
             <div class="flex items-center">
-                <p id="userIdDisplay" class="text-sm text-gray-600 mr-4 fade-in-up" style="animation-delay: 0.2s;">使用者 ID: 載入中...</p>
+                <p id="userIdDisplay" class="text-sm text-gray-600 mr-4 fade-in-up" style="animation-delay: 0.2s;">離線模式</p>
                 <button id="goToHomepageButton"
                         class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition duration-150 ease-in-out transform hover:scale-105">
                     回首頁
                 </button>
             </div>
-            <img src="https://placehold.co/50x50/ffffff/000000?text=Money" onerror="this.onerror=null;this.src='https://placehold.co/50x50/ffffff/000000?text=Error';" alt="Money Symbol" class="absolute left-0 top-1/2 -translate-y-1/2 -ml-16 hidden sm:block fade-in" style="animation-delay: 0.4s;">
-            <img src="https://placehold.co/50x50/ffffff/000000?text=Money" onerror="this.onerror=null;this.src='https://placehold.co/50x50/ffffff/000000?text=Error';" alt="Money Symbol" class="absolute right-0 top-1/2 -translate-y-1/2 -mr-16 hidden sm:block fade-in" style="animation-delay: 0.6s;">
         </div>
 
         <div class="mb-10 p-6 bg-rose-50 rounded-lg shadow-md fade-in-up" style="animation-delay: 0.8s;">
             <h2 class="text-2xl font-semibold text-rose-900 mb-6">新增貸款申請</h2>
-            <img src="https://placehold.co/40x40/ffffff/000000?text=Cash" onerror="this.onerror=null;this.src='https://placehold.co/40x40/ffffff/000000?text=Error';" alt="Cash Icon" class="absolute top-4 right-4 hidden md:block fade-in" style="animation-delay: 1s;">
             <form id="loanApplicationForm" class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <label for="customerName" class="block text-sm font-medium text-gray-700 mb-1">客戶姓名</label>
@@ -420,22 +386,7 @@
         </div>
     </div>
 
-    <script type="module">
-        // Ensure Firebase related objects are loaded
-        const db = window.db;
-        const auth = window.auth;
-        const initialAuthToken = window.initialAuthToken;
-        const appId = window.appId;
-        const collection = window.collection;
-        const addDoc = window.addDoc;
-        const setDoc = window.setDoc;
-        const deleteDoc = window.deleteDoc;
-        const onSnapshot = window.onSnapshot;
-        const doc = window.doc;
-        const signInAnonymously = window.signInAnonymously;
-        const signInWithCustomToken = window.signInWithCustomToken;
-        const onAuthStateChanged = window.onAuthStateChanged;
-
+    <script>
         // Get elements
         const homepageSection = document.getElementById('homepage');
         const crmContentSection = document.getElementById('crmContent');
@@ -448,7 +399,7 @@
         const editModal = document.getElementById('editModal');
         const editApplicationForm = document.getElementById('editApplicationForm');
         const loadingOverlay = document.getElementById('loadingOverlay');
-        const userIdDisplay = document.getElementById('userIdDisplay');
+        const userIdDisplay = document.getElementById('userIdDisplay'); // This will now just show "離線模式"
 
         const messageBox = document.getElementById('messageBox');
         const messageText = document.getElementById('messageText');
@@ -481,8 +432,6 @@
 
         // Array to store all loan applications
         let loanApplications = [];
-        let currentUserId = null;
-        let unsubscribeFirestore = null; // Used to store the Firestore listener unsubscribe function
 
         // Pagination state
         const itemsPerPage = 5; // Number of items to display per page
@@ -500,7 +449,7 @@
             messageBox.style.display = 'none';
         }
 
-        // Function to show loading overlay
+        // Function to show loading overlay (for initial animations)
         function showLoading() {
             loadingOverlay.style.display = 'flex';
         }
@@ -721,13 +670,11 @@
 
 
         // Listen for form submission event
-        loanApplicationForm.addEventListener('submit', async function(event) {
+        loanApplicationForm.addEventListener('submit', function(event) {
             event.preventDefault(); // Prevent default form submission behavior
 
-            if (!currentUserId) {
-                showMessageBox("系統初始化中，請稍候再試。");
-                return;
-            }
+            // Generate a simple unique ID for localStorage
+            const newId = Date.now().toString();
 
             // Get form input values
             const loanAmount = parseFloat(loanAmountInput.value);
@@ -739,6 +686,7 @@
             const monthlyPayment = calculateMonthlyPayment(loanAmount, interestRate, loanTermMonths, interestRatePeriod, isInterestOnly);
 
             const newApplication = {
+                id: newId, // Assign the generated ID
                 customerName: document.getElementById('customerName').value,
                 loanAmount: loanAmount,
                 interestRate: interestRate,
@@ -753,14 +701,11 @@
                 createdAt: new Date().toISOString() // Add creation timestamp
             };
 
-            try {
-                // Add data to Firestore
-                await addDoc(collection(db, `artifacts/${appId}/users/${currentUserId}/loanApplications`), newApplication);
-                showMessageBox("貸款申請已成功新增！");
-            } catch (e) {
-                console.error("Error adding document: ", e);
-                showMessageBox(`新增申請失敗: ${e.message}`);
-            }
+            loanApplications.push(newApplication);
+            saveApplications(); // Save to localStorage
+            renderAllApplications(); // Re-render tables
+
+            showMessageBox("貸款申請已成功新增！");
 
             // Clear form and reset interest-only checkbox
             loanApplicationForm.reset();
@@ -829,12 +774,7 @@
         }
 
         // Save edited application
-        window.saveEditedApplication = async function() {
-            if (!currentUserId) {
-                showMessageBox("系統初始化中，請稍候再試。");
-                return;
-            }
-
+        window.saveEditedApplication = function() {
             const id = document.getElementById('editApplicationId').value;
             const updatedInterestRate = parseFloat(editInterestRateInput.value);
             const updatedInterestRatePeriod = editInterestRatePeriodSelect.value;
@@ -849,7 +789,8 @@
             if (appIndex > -1) {
                 const currentLoanAmount = loanApplications[appIndex].loanAmount; // Get loan amount from original data
 
-                const updatedData = {
+                loanApplications[appIndex] = {
+                    ...loanApplications[appIndex], // Keep existing properties like ID, customerName, loanAmount
                     interestRate: updatedInterestRate,
                     interestRatePeriod: updatedInterestRatePeriod,
                     isInterestOnly: updatedIsInterestOnly,
@@ -866,42 +807,27 @@
                     applicationStatus: updatedApplicationStatus,
                     notes: updatedNotes
                 };
-
-                try {
-                    // Update document in Firestore
-                    await setDoc(doc(db, `artifacts/${appId}/users/${currentUserId}/loanApplications`, id), updatedData, { merge: true });
-                    showMessageBox("貸款申請已成功更新！");
-                } catch (e) {
-                    console.error("Error updating document: ", e);
-                    showMessageBox(`更新申請失敗: ${e.message}`);
-                }
+                saveApplications(); // Save to localStorage
+                renderAllApplications(); // Re-render tables
+                showMessageBox("貸款申請已成功更新！");
                 closeEditModal(); // Close modal
             }
         }
 
         // Delete application
-        window.deleteApplication = async function(id) {
-            if (!currentUserId) {
-                showMessageBox("系統初始化中，請稍候再試。");
-                return;
-            }
-
+        window.deleteApplication = function(id) {
             showMessageBox("確定要刪除這筆申請嗎？");
             messageBox.innerHTML += `<button onclick="confirmDelete('${id}')">確認</button><button onclick="closeMessageBox()" class="ml-3">取消</button>`;
         }
 
         // Confirm delete
-        window.confirmDelete = async function(id) {
+        window.confirmDelete = function(id) {
             closeMessageBox(); // Close confirmation message
 
-            try {
-                // Delete document from Firestore
-                await deleteDoc(doc(db, `artifacts/${appId}/users/${currentUserId}/loanApplications`, id));
-                showMessageBox("貸款申請已成功刪除！");
-            } catch (e) {
-                console.error("Error removing document: ", e);
-                showMessageBox(`刪除申請失敗: ${e.message}`);
-            }
+            loanApplications = loanApplications.filter(app => app.id !== id);
+            saveApplications(); // Save to localStorage
+            renderAllApplications(); // Re-render tables
+            showMessageBox("貸款申請已成功刪除！");
         }
 
         // Pagination event listeners
@@ -954,73 +880,28 @@
         goToCrmButton.addEventListener('click', () => navigateTo('crm'));
         goToHomepageButton.addEventListener('click', () => navigateTo('homepage'));
 
-
-        // Initialize Firebase and load data
-        async function initializeAppAndLoadData() {
-            showLoading(); // Show loading overlay
-
-            // 1. Handle Firebase authentication (anonymous sign-in or custom token)
-            try {
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (error) {
-                console.error("Firebase authentication error:", error);
-                // Even if authentication fails, try anonymous sign-in, or display error message
-                try {
-                    await signInAnonymously(auth);
-                } catch (anonError) {
-                    console.error("Anonymous sign-in failed:", anonError);
-                    userIdDisplay.textContent = "使用者 ID: 認證失敗";
-                    hideLoading();
-                    return; // If authentication fails, stop further operations
-                }
+        // --- localStorage functions ---
+        function loadApplications() {
+            const storedApplications = localStorage.getItem('loanApplications');
+            if (storedApplications) {
+                loanApplications = JSON.parse(storedApplications);
+            } else {
+                loanApplications = []; // Initialize if nothing is stored
             }
+        }
 
-            onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    currentUserId = user.uid;
-                    userIdDisplay.textContent = `使用者 ID: ${currentUserId}`;
+        function saveApplications() {
+            localStorage.setItem('loanApplications', JSON.stringify(loanApplications));
+        }
+        // --- End localStorage functions ---
 
-                    // If there's a previous listener, unsubscribe
-                    if (unsubscribeFirestore) {
-                        unsubscribeFirestore();
-                    }
 
-                    // Listen for Firestore data changes
-                    const q = collection(db, `artifacts/${appId}/users/${currentUserId}/loanApplications`);
-                    unsubscribeFirestore = onSnapshot(q, (snapshot) => {
-                        loanApplications = [];
-                        snapshot.forEach((doc) => {
-                            loanApplications.push({ id: doc.id, ...doc.data() });
-                        });
-                        // Render applications only if CRM content is visible, or after initial load
-                        if (crmContentSection.style.display === 'block') {
-                            renderAllApplications(); // Re-render when data changes
-                        }
-                        hideLoading(); // Hide loading overlay after data is loaded
-                    }, (error) => {
-                        console.error("Error fetching documents from Firestore:", error);
-                        showMessageBox(`載入資料失敗: ${error.message}`);
-                        hideLoading();
-                    });
-                } else {
-                    currentUserId = null;
-                    userIdDisplay.textContent = "使用者 ID: 未登入";
-                    loanApplications = [];
-                    // Render applications even if not logged in (will show "no data")
-                    renderAllApplications();
-                    hideLoading();
-
-                    // If there's a Firestore listener, unsubscribe
-                    if (unsubscribeFirestore) {
-                        unsubscribeFirestore();
-                        unsubscribeFirestore = null;
-                    }
-                }
-            });
+        // Initialize the application
+        function initializeApp() {
+            showLoading(); // Show loading overlay for initial animation
+            loadApplications(); // Load data from localStorage
+            renderAllApplications(); // Render initial data
+            hideLoading(); // Hide loading overlay
 
             // Initialize loan term input state based on default "interest only" checkbox state on page load
             toggleLoanTermInput(isInterestOnlyCheckbox.checked, loanTermMonthsInput);
@@ -1030,7 +911,7 @@
         }
 
         // Execute initialization when the window loads
-        window.onload = initializeAppAndLoadData;
+        window.onload = initializeApp;
     </script>
 </body>
 </html>
